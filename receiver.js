@@ -1,6 +1,8 @@
 require('dotenv').config();
 let variables = process.env
 
+const axios = require("axios");
+
 //Inizializza MQTT
 const mqtt = require('mqtt')
 const host = variables.HOST_MQTT
@@ -21,10 +23,11 @@ const url = variables.URL_INFLUX
 let org = variables.ORG_INFLUX
 let bucket = variables.BUCKET_INFLUX
 const {InfluxDB, Point} = require('@influxdata/influxdb-client')
-const axios = require("axios");
 const clientInflux = new InfluxDB({url, token})
 let writeClient = clientInflux.getWriteApi(org, bucket, 'ns')
 
+//OpenWeather
+const urlOpenWeather = 'https://api.openweathermap.org/data/2.5/weather?lat=44.495377359445904&lon=11.386158929048305&units=metric&appid=3e877f0f053735d3715ca7e534ca8efa'
 
 /** MQTT **/
 //Quando riceve un messaggio MQTT
@@ -32,6 +35,12 @@ clientMQTT.on('message', async (topic, payload) => {
     console.log('MQTT -> ', topic, payload.toString())
     let message = JSON.parse(payload.toString())
 
+    let tempAPI = await axios.get(urlOpenWeater).then(response => {
+        return response.data.main.temp
+    }).catch(error => {
+        console.error("Errore!!!!")
+    })
+        
     let point = new Point('measurement')
         .tag('id', 'esp32_nostro')
         .tag('gps', 'BO')
@@ -40,6 +49,7 @@ clientMQTT.on('message', async (topic, payload) => {
         .floatField('gas', parseFloat(message.gas))
         .floatField('aqi', parseFloat(message.aqi))
         .floatField('wifi_signal', parseFloat(message.wifi_signal))
+        .floatField('temperatureAPI', tempAPI)
 
     writeClient.writePoint(point)
 })
