@@ -1,26 +1,18 @@
-#map11 {
-    height: 180px;
-}
-
-#map22 {
-    height: 180px;
-}
-
-#map33 {
-    height: 180px;
-}
-
-#map44 {
-    height: 180px;
-}
-
-
 .navbar-brand {
     margin-left: 20px;
     font-size: 26px;
     font-weight: bold;
 }
 
-.form-control {
-    border-width: medium;
+.navbar {
+    margin-bottom: 40px;
+}
+.card{
+    margin-left: 20px;
+    margin-right: 20px;
+    border-color: black;
+}
+
+form.d-flex {
+    margin-right: 10px;
 }

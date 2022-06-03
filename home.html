@@ -20,14 +20,18 @@
             integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ=="
             crossorigin=""></script>
 
-
+    <!-- JQuery -->
+    <script src="https://code.jquery.com/jquery-3.5.0.js"></script>
     <!-- CSS -->
     <link href="style.css" rel="stylesheet">
 </head>
 <body>
-<nav class="navbar navbar-light bg-light">
+<nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <a class="navbar-brand">Air Quality Monitoring System</a>
+
+        <a class="navbar-brand">
+            <img src="/immagini/logo.png" alt="" width="32" height="30" class="d-inline-block align-text-bottom">
+            Air Quality Monitoring System</a>
         <form class="d-flex">
             <input class="form-control me-2" type="search" placeholder="Nome dispositivo" aria-label="Nome dispositivo">
             <button class="btn btn-success" type="submit">Aggiungi</button>
@@ -37,115 +41,8 @@
 
 
 
-<div class="row row-cols-1 row-cols-md-2 g-4">
-    <div class="col">
-        <div class="card">
-            <div class="card-body">
-                <div class="row g-0">
-                    <div class="col-md-5">
-                        <h5 class="card-title">ESP32 - ID_1</h5>
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item">Temperature: 27</li>
-                            <li class="list-group-item">Humidity: 20%</li>
-                            <li class="list-group-item">AQI: 0.5</li>
-                        </ul>
-                    </div>
-                    <div class="vr col-md-1 offset-md-1"></div>
-                    <div class="col-md-5 ms-auto">
-                        <div class="d-grid gap-4">
-                            <button class="btn btn-primary" type="button">Vedi su grafana</button>
-                            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" href="#map1" role="button" aria-expanded="false" aria-controls="map1">Vedi su mappa</button>
-                            <button class="btn btn-primary" type="button">Cambia parametri</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="collapse" id="map1">
-                <div id="map11"></div>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card">
-            <div class="card-body">
-                <div class="row g-0">
-                    <div class="col-md-5">
-                        <h5 class="card-title">ESP32 - ID_2</h5>
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item">Temperature: 27</li>
-                            <li class="list-group-item">Humidity: 20%</li>
-                            <li class="list-group-item">AQI: 0.5</li>
-                        </ul>
-                    </div>
-                    <div class="vr col-md-1 offset-md-1"></div>
-                    <div class="col-md-5 ms-auto">
-                        <div class="d-grid gap-4">
-                            <button class="btn btn-primary" type="button">Vedi su grafana</button>
-                            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" href="#map2" role="button" aria-expanded="false" aria-controls="map2">Vedi su mappa</button>
-                            <button class="btn btn-primary" type="button">Cambia parametri</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="collapse" id="map2">
-                <div id="map22"></div>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card">
-            <div class="card-body">
-                <div class="row g-0">
-                    <div class="col-md-5">
-                        <h5 class="card-title">ESP32 - ID_3</h5>
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item">Temperature: 27</li>
-                            <li class="list-group-item">Humidity: 20%</li>
-                            <li class="list-group-item">AQI: 0.5</li>
-                        </ul>
-                    </div>
-                    <div class="vr col-md-1 offset-md-1"></div>
-                    <div class="col-md-5 ms-auto">
-                        <div class="d-grid gap-4">
-                            <button class="btn btn-primary" type="button">Vedi su grafana</button>
-                            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" href="#map3" role="button" aria-expanded="false" aria-controls="map3">Vedi su mappa</button>
-                            <button class="btn btn-primary" type="button">Cambia parametri</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="collapse" id="map3">
-                <div id="map33"></div>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card">
-            <div class="card-body">
-                <div class="row g-0">
-                    <div class="col-md-5">
-                        <h5 class="card-title">ESP32 - ID_4</h5>
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item">Temperature: 27</li>
-                            <li class="list-group-item">Humidity: 20%</li>
-                            <li class="list-group-item">AQI: 0.5</li>
-                        </ul>
-                    </div>
-                    <div class="vr col-md-1 offset-md-1"></div>
-                    <div class="col-md-5 ms-auto">
-                        <div class="d-grid gap-4">
-                            <button class="btn btn-primary" type="button">Vedi su grafana</button>
-                            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" href="#map4" role="button" aria-expanded="false" aria-controls="map4">Vedi su mappa</button>
-                            <button class="btn btn-primary" type="button">Cambia parametri</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="collapse" id="map4">
-                <div id="map44"></div>
-            </div>
-        </div>
-    </div>
+<div class="row row-cols-1 row-cols-md-2 g-4" id="containerCards">
+    <!-- Si aggiungeranno le carte dallo script in base a quanti dispositivi abbiamo aggiunto. -->
 </div>
 
 

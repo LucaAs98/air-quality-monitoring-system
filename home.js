@@ -1,63 +1,82 @@
-var realTerrain = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {})
-var realTerrain2 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {})
-var realTerrain3 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {})
-var realTerrain4 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {})
-
-const mapDiv1 = document.getElementById("map1");
-const mapDiv2 = document.getElementById("map2");
-const mapDiv3 = document.getElementById("map3");
-const mapDiv4 = document.getElementById("map4");
-
-
-var mymap1 = L.map('map11', {
-    center: [44.49712, 11.34248],
-    zoom: 15,
-    layers: [realTerrain],
-});
-
-var marker = L.marker([44.49712, 11.34248]).addTo(mymap1);
-
-var mymap2 = L.map('map22', {
-    center: [44.49712, 11.34248],
-    zoom: 15,
-    layers: [realTerrain2],
-});
-
-var marker2 = L.marker([44.49712, 11.34248]).addTo(mymap2);
+//Array dei dispositivi da visualizzare. Si dovranno prendere da firebase.
+let arrayESP32 = [
+    {
+        id: 'esp1',
+        lat: 44.49712,
+        long: 11.34248
+    },
+    {
+        id: 'esp2',
+        lat: 44.49712,
+        long: 11.34248
+    },
+    {
+        id: 'esp3',
+        lat: 44.49712,
+        long: 11.34248
+    },
+    {
+        id: 'esp4',
+        lat: 44.49712,
+        long: 11.34248
+    }]
 
 
+//Scorriamo tutti i dispositivi che vogliamo visualizzare
+arrayESP32.forEach((result, idx) => {
+    //Nuovo layer per ogni dispositivo che vogliamo visualizzare
+    const realTerrain = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {})
 
-var mymap3 = L.map('map33', {
-    center: [44.49712, 11.34248],
-    zoom: 15,
-    layers: [realTerrain3],
-});
+    //Nuova carta per ogni dispositivo che vogliamo visualizzare
+    let newCard = `<div class="col">
+        <div class="card">
+            <div class="card-body">
+                <div class="row g-0">
+                    <div class="col-md-5">
+                        <h5 class="card-title">${result.id}</h5>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">Temperature: 27</li>
+                            <li class="list-group-item">Humidity: 20%</li>
+                            <li class="list-group-item">AQI: 0.5</li>
+                        </ul>
+                    </div>
+                    <div class="vr col-md-1 offset-md-1"></div>
+                    <div class="col-md-5 ms-auto">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" type="button">Vedi su grafana</button>
+                            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" href="#map_div_${idx}" role="button" aria-expanded="false" aria-controls="map_div_${idx}">Vedi su mappa</button>
+                            <button class="btn btn-primary" type="button">Cambia parametri</button>
+                            <button class="btn btn-danger" type="button">Rimuovi</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="collapse" id="map_div_${idx}">
+                <div id="map${idx}"></div>
+            </div>
+        </div>
+    </div>`
 
-var marker3 = L.marker([44.49712, 11.34248]).addTo(mymap3);
+    //Appendiamo una carta di un nuovo dispositivo
+    $('#containerCards').append(newCard)
 
+    //Creiamo la mappa per quest'ultimo
+    var map = L.map(`map${idx}`, {
+        center: [result.lat, result.long],
+        zoom: 15,
+        layers: [realTerrain],
+    });
 
-var mymap4 = L.map('map44', {
-    center: [44.49712, 11.34248],
-    zoom: 15,
-    layers: [realTerrain4],
-});
+    //Aggiungiamo il marker che permette di capire dove si trova nella mappa
+    var marker = L.marker([result.lat, result.long]).addTo(map);
 
-var marker4 = L.marker([44.49712, 11.34248]).addTo(mymap4);
+    //Impostiamo l'altezza della mappa
+    $(`#map${idx}`).css('height', 180 + 'px');
 
-const resizeObserver = new ResizeObserver(() => {
-    mymap1.invalidateSize();
-    mymap2.invalidateSize();
-    mymap3.invalidateSize();
-    mymap4.invalidateSize();
-});
-
-
-resizeObserver.observe(mapDiv1)
-resizeObserver.observe(mapDiv2)
-resizeObserver.observe(mapDiv3)
-resizeObserver.observe(mapDiv4)
-
-/*
-resizeObserver2.observe(mapDiv2)
-resizeObserver3.observe(mapDiv3)
-resizeObserver4.observe(mapDiv4)*/
+    /* Istruzioni necessarie per evitare che la mappa non si veda bene. Controlla quando il div che contiene si modifica
+    *  in modo tale da aggiornare la dimensione della mappa. (Non importante)*/
+    const resizeObserver = new ResizeObserver(() => {
+        map.invalidateSize();
+    });
+    resizeObserver.observe($(`#map_div_${idx}`)[0])
+})
