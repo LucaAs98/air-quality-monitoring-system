@@ -12,11 +12,15 @@
   "dependencies": {
     "@influxdata/influxdb-client": "^1.26.0",
     "arima": "^0.2.5",
-    "coap": "^1.0.11"
+    "bootstrap": "^5.2.0-beta1",
+    "coap": "^1.0.11",
+    "express": "^4.18.1",
+    "open": "^8.4.0"
   },
   "devDependencies": {
     "axios": "^0.27.2",
     "dotenv": "^16.0.1",
+    "ejs": "^3.1.8",
     "meteostat": "^2.0.0",
     "mqtt": "^4.3.7",
     "timeseries-analysis": "^1.0.12"
