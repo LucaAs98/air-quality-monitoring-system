@@ -1,7 +1,10 @@
+require('dotenv').config();
+let variables = process.env
+
 //Inizializza MQTT
 const mqtt = require('mqtt')
-const host = 'localhost'
-const port = '1883'
+const host = variables.HOST_MQTT
+const port = variables.PORT_MQTT
 const connectUrl = `mqtt://${host}:${port}`
 const clientMQTT = mqtt.connect(connectUrl, {
     clean: true,

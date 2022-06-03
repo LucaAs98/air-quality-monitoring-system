@@ -8,5 +8,17 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@influxdata/influxdb-client": "^1.26.0",
+    "arima": "^0.2.5",
+    "coap": "^1.0.11"
+  },
+  "devDependencies": {
+    "axios": "^0.27.2",
+    "dotenv": "^16.0.1",
+    "meteostat": "^2.0.0",
+    "mqtt": "^4.3.7",
+    "timeseries-analysis": "^1.0.12"
+  }
 }
