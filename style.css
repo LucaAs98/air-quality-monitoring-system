@@ -1,18 +1,16 @@
 .navbar-brand {
-    margin-left: 20px;
     font-size: 26px;
     font-weight: bold;
 }
 
 .navbar {
-    margin-bottom: 40px;
+    padding: 1.5%;
 }
 .card{
-    margin-left: 20px;
-    margin-right: 20px;
     border-color: black;
 }
 
-form.d-flex {
-    margin-right: 10px;
+#containerCards {
+    padding: 1%;
+    width: 100%;
 }
