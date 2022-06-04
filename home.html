@@ -32,8 +32,8 @@
         <a class="navbar-brand">
             <img src="/immagini/logo.png" alt="" width="32" height="30" class="d-inline-block align-text-bottom">
             Air Quality Monitoring System</a>
-        <form class="d-flex">
-            <input class="form-control me-2" type="search" placeholder="Nome dispositivo" aria-label="Nome dispositivo">
+        <form class="d-flex" name="form_add_esp32" action="/home" onsubmit="return validateForm()" method="post">
+            <input name="device_name" class="form-control me-2" type="text" placeholder="Nome dispositivo" aria-label="Nome dispositivo">
             <button class="btn btn-success" type="submit">Aggiungi</button>
         </form>
     </div>

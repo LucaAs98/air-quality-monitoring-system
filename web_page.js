@@ -16,9 +16,12 @@ app.listen(3000, () => {
 
 
 /*** Richieste GET ***/
-/* Ad URL "/home" rendirizziamo "home.html". Questo a sua volta chiamerà lo script "home.js" che farà tutte le operazioni
-*  sulla mappa. */
+/* Ad URL "/home" rendirizziamo "home.html". Questo a sua volta chiamerà lo script "home.js". */
 app.get("/home", (req, res) => {
+    res.render("home.html");
+});
+
+app.post("/home", (req, res) => {
     res.render("home.html");
 });
 
