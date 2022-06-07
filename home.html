@@ -22,6 +22,8 @@
 
     <!-- JQuery -->
     <script src="https://code.jquery.com/jquery-3.5.0.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.14.0/jquery.validate.min.js"></script>
 
     <!-- Favicon -->
     <link rel="shortcut icon" href="/immagini/favicon.ico" type="image/x-icon">
@@ -37,9 +39,10 @@
         <a class="navbar-brand">
             <img src="/immagini/logo.png" alt="" width="32" height="30" class="d-inline-block align-text-bottom">
             Air Quality Monitoring System</a>
-        <form class="d-flex" name="form_add_esp32" action="/home" onsubmit="return validateForm()" method="post">
-            <input name="device_name" class="form-control me-2" type="text" placeholder="Nome dispositivo" aria-label="Nome dispositivo">
-            <button class="btn btn-success" type="submit">Aggiungi</button>
+        <form class="d-flex" name="form_add_esp32" action="/home">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target=#modal_add_device
+                    data-bs-whatever="add_device">Aggiungi dispositivo
+            </button>
         </form>
     </div>
 </nav>
@@ -48,7 +51,77 @@
 <div class="row row-cols-1 row-cols-md-2 g-4" id="containerCards">
     <!-- Si aggiungeranno le carte dallo script in base a quanti dispositivi abbiamo aggiunto. -->
 </div>
-
+<figure class="text-center" id="no_device">
+    <blockquote class="blockquote">
+        <p>No device registered!</p>
+    </blockquote>
+</figure>
+<figure class="text-center" id="loading">
+    <blockquote class="blockquote">
+        <p>Loading....</p>
+    </blockquote>
+</figure>
+<div class="modal fade" id=modal_add_device tabindex="-1" aria-labelledby=modal_add_device_label aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="modal-form">
+                <div class="modal-header">
+                    <h5 class="modal-title" id=modal_add_device_label>Add new device</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="id_new_device" class="form-label">ID</label>
+                        <input type="text" class="form-control" id="id_new_device" name="id"
+                               placeholder="Metti qui l'ID del tuo device" aria-describedby="id_help" required>
+                        <div id="validationServerUsernameFeedback" class="invalid-feedback">
+                            Please choose a username.
+                        </div>
+                        <p class="my-error-class" id="errore_id_presente">This device is already registred, use another
+                            id please</p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="max_gas_value_new_device" class="form-label">MAX_GAS_VALUE</label>
+                        <input type="text" class="form-control" id="max_gas_value_new_device" name="max_gas"
+                               placeholder="Metti qui la soglia massima del gas" aria-describedby="max_gas_help"
+                               required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="min_gas_value_new_device" class="form-label">MIN_GAS_VALUE</label>
+                        <input type="text" class="form-control" id="min_gas_value_new_device" name="min_gas"
+                               placeholder="Metti qui la soglia minima del gas" aria-describedby="min_gas_help"
+                               required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="sample_frequency_value_new_device" class="form-label">SAMPLE FREQUENCY</label>
+                        <input type="text" class="form-control" id="sample_frequency_value_new_device"
+                               name="sample_frequency"
+                               placeholder="Metti qui la sample frequency" aria-describedby="sample_frequency_help"
+                               required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="protocol_dropdown" class="form-label">PROTOCOL</label>
+                        <div class="dropdown">
+                            <button class="btn btn-secondary dropdown-toggle" type="button" id="protocol_dropdown"
+                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                MQTT
+                            </button>
+                            <ul class="dropdown-menu" aria-labelledby="protocol_dropdown">
+                                <li class="dropdown-item">MQTT</li>
+                                <li class="dropdown-item">COAP</li>
+                                <li class="dropdown-item">HTTP</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-success" id="add_new_device">Add new device</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <script type="text/javascript" src="home.js" crossorigin=""></script>
 </body>

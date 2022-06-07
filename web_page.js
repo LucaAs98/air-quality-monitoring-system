@@ -1,9 +1,13 @@
+require('dotenv').config();
+let variables = process.env
+
 const express = require("express");
 const open = require('open');
-
 const app = express();
 
 app.set('views', __dirname + '/');
+// Parse URL-encoded bodies (as sent by HTML forms)
+app.use(express.urlencoded());
 app.engine('html', require('ejs').renderFile);
 app.set('view engine', 'ejs');
 
@@ -15,16 +19,91 @@ app.listen(3000, () => {
 });
 
 
+// Import the functions you need from the SDKs you need
+let admin = require("firebase-admin");
+let serviceAccount = require("./progettoiot2022-firebase-adminsdk-hoxdu-085c6305e8.json");
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: "https://progettoiot2022-default-rtdb.europe-west1.firebasedatabase.app"
+});
+
+// As an admin, the app has access to read and write all data, regardless of Security Rules
+let db = admin.firestore();
+
 /*** Richieste GET ***/
 /* Ad URL "/home" rendirizziamo "home.html". Questo a sua volta chiamerà lo script "home.js". */
 app.get("/home", (req, res) => {
     res.render("home.html");
 });
 
+app.get("/devices", async (req, res) => {
+    let errore;
+    let response = await getDevices().catch((err) => errore = err);
+
+    if (!response) {
+        console.log('Error, i cannot load the devices.' + '\n' + errore);
+    } else {
+        res.json(response);
+    }
+});
+
+/*** Richieste POST **/
+
 app.post("/home", (req, res) => {
     res.render("home.html");
 });
 
+//Inviamo il nuovo device a firebase
+app.post("/add_device", async (req, res) => {
+    const id = req.body.id
+    const data = {
+        max_gas_value: req.body.max,
+        min_gas_value: req.body.min,
+        protocol: req.body.protocol,
+        sample_frequency: req.body.sample_frequency,
+    };
+
+    const request = await db.collection('device').doc(id).set(data)
+});
+
+//Inviamo l'update del device
+app.post("/update_device", async (req, res) => {
+    const id = req.body.id
+    const data = {
+        max_gas_value: req.body.max,
+        min_gas_value: req.body.min,
+        protocol: req.body.protocol,
+        sample_frequency: req.body.sample_frequency,
+    };
+
+    const request = await db.collection('device').doc(id).update(data)
+});
+
+//Rimuoviamo un device
+app.post("/remove_device", async (req, res) => {
+    const request = await db.collection('device').doc(req.body.id).delete()
+})
+
+
+async function getDevices() {
+    const devicesCollection = await db.collection('device').get();
+    let arrayESP32 = [];
+
+    devicesCollection.forEach((result) => {
+        arrayESP32.push({
+            id: result.id,
+            max: result.data().max_gas_value,
+            min: result.data().min_gas_value,
+            sample_frequency: result.data().sample_frequency,
+            protocol: result.data().protocol,
+            lat: 41,
+            long: 11
+        })
+    })
+
+    return arrayESP32
+}
 
 // All'avvio apriamo la home con il browser di default.
 open("http://localhost:3000/home");

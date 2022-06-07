@@ -14,3 +14,11 @@
     padding: 1%;
     width: 100%;
 }
+
+.my-error-class {
+    color:#FF0000;  /* red */
+}
+
+#no_device, #loading{
+    margin-top: 100px;
+}
