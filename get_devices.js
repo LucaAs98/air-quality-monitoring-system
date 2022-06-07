@@ -62,7 +62,7 @@ function aggiungiCarta(result) {
         <div class="modal fade" id=modal${result.id} tabindex="-1" aria-labelledby=modal${result.id}Label aria-hidden="true">
           <div class="modal-dialog">
             <div class="modal-content">  
-                <form id="modal-form">
+                <form id="modal-form-${result.id}">
                   <div class="modal-header">
                     <h5 class="modal-title" id=modal${result.id}Label>Change ${result.id}'s parameters</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -96,7 +96,7 @@ function aggiungiCarta(result) {
                   </div>
                   <div class="modal-footer">
                     <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-success" id="change_parameters">Cambia parametri</button>
+                    <button type="submit" class="btn btn-success" id="change_parameters_${result.id}">Cambia parametri</button>
                   </div>
                 </div>
             </form>
@@ -149,7 +149,7 @@ function aggiungiCarta(result) {
 
 
         /* Controlliamo che i campi siano correttamente completati. */
-        $("#modal-form").validate({
+        $(`#modal-form-${result.id}`).validate({
             errorClass: "my-error-class",
             rules: {
                 max_gas: {
