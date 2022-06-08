@@ -36,21 +36,21 @@ clientMQTT.on('message', async (topic, payload) => {
     let message = JSON.parse(payload.toString())
 
     //Prendiamo la temperatura da openWeatherMap
-    let tempOpenWeather = await axios.get(urlOpenWeather).then(response => {
+/*    let tempOpenWeather = await axios.get(urlOpenWeather).then(response => {
         return response.data.main.temp
     }).catch(error => {
         console.error("Errore! Non sono riuscito a fare la richiesta a OpenWeatherMap")
-    })
+    })*/
         
     let point = new Point('measurement')
-        .tag('id', 'esp32_nostro')
+        .tag('id', 'esp1')
         .tag('gps', 'BO')
         .floatField('temperature', parseFloat(message.temperature))
         .floatField('humidity', parseFloat(message.humidity))
         .floatField('gas', parseFloat(message.gas))
         .floatField('aqi', parseFloat(message.aqi))
         .floatField('wifi_signal', parseFloat(message.wifi_signal))
-        .floatField('tempOpenWeather', tempOpenWeather)
+        //.floatField('tempOpenWeather', tempOpenWeather)
 
     writeClient.writePoint(point)
 })

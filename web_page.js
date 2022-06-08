@@ -28,6 +28,18 @@ admin.initializeApp({
     databaseURL: "https://progettoiot2022-default-rtdb.europe-west1.firebasedatabase.app"
 });
 
+//INFLUXDB
+const token = variables.TOKEN_INFLUX
+const url = variables.URL_INFLUX
+
+const {InfluxDB, Point} = require('@influxdata/influxdb-client')
+const clientInflux = new InfluxDB({url, token})
+
+let org = process.env.ORG_INFLUX
+let bucket = process.env.BUCKET_INFLUX
+
+let queryClient = clientInflux.getQueryApi(org)
+
 // As an admin, the app has access to read and write all data, regardless of Security Rules
 let db = admin.firestore();
 
@@ -46,6 +58,29 @@ app.get("/devices", async (req, res) => {
     } else {
         res.json(response);
     }
+});
+
+app.get("/get_influx_data", async (req, res) => {
+    let fluxQuery = `from(bucket: "iotProject2022")
+    |> range(start: -10d)
+ |> group(columns: ["id", "_field"])
+ |> mean()`
+
+    let data = []
+
+    await queryClient.queryRows(fluxQuery, {
+        next: (row, tableMeta) => {
+            const tableObject = tableMeta.toObject(row)
+            data.push(tableObject)
+        },
+        error: (error) => {
+            console.log('Error, i cannot load influx data.' + ' -> ' + error);
+        },
+        complete: () => {
+            data = influxDataFormat(data)
+            res.json(data);
+        },
+    })
 });
 
 /*** Richieste POST **/
@@ -103,6 +138,47 @@ async function getDevices() {
     })
 
     return arrayESP32
+}
+
+/*
+
+async function getInfluxData() {
+    let fluxQuery = `from(bucket: "iotProject2022")
+    |> range(start: -10d)
+ |> group(columns: ["id", "_field"])
+ |> mean()`
+
+    let data = []
+
+    await queryClient.queryRows(fluxQuery, {
+        next: (row, tableMeta) => {
+            const tableObject = tableMeta.toObject(row)
+            data.push(tableObject)
+        },
+        error: (error) => {
+            console.error('\nError', error)
+        },
+        complete: () => {
+            //console.log(data)
+            console.log('\nSuccess')
+            console.log("primo" + data)
+
+        },
+    })
+    console.log("secondo")
+    return data
+}
+*/
+
+function influxDataFormat(data) {
+    let newData = []
+    data.forEach(obj =>
+        newData.push({
+            id: obj.id,
+            field: obj._field,
+            value: obj._value,
+        }))
+    return newData
 }
 
 // All'avvio apriamo la home con il browser di default.
