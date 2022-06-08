@@ -11,8 +11,8 @@ const connectUrl = `mqtt://${host}:${port}`
 const clientMQTT = mqtt.connect(connectUrl, {
     clean: true,
     connectTimeout: 4000,
-    username: 'luca',
-    password: 'public',
+    username: variables.USERNAME_MQTT,
+    password: variables.PASSWORD_MQTT,
     reconnectPeriod: 1000,
 })
 
@@ -26,8 +26,6 @@ const {InfluxDB, Point} = require('@influxdata/influxdb-client')
 const clientInflux = new InfluxDB({url, token})
 let writeClient = clientInflux.getWriteApi(org, bucket, 'ns')
 
-//OpenWeather
-const urlOpenWeather = 'https://api.openweathermap.org/data/2.5/weather?lat=44.495377359445904&lon=11.386158929048305&units=metric&appid=3e877f0f053735d3715ca7e534ca8efa'
 
 /** MQTT **/
 //Quando riceve un messaggio MQTT
@@ -35,22 +33,25 @@ clientMQTT.on('message', async (topic, payload) => {
     console.log('MQTT -> ', topic, payload.toString())
     let message = JSON.parse(payload.toString())
 
+    //OpenWeather
+    const urlOpenWeather = 'https://api.openweathermap.org/data/2.5/weather?lat=' + message.lat + '&lon=' + message.lon + '&units=metric&appid=3e877f0f053735d3715ca7e534ca8efa'
+
     //Prendiamo la temperatura da openWeatherMap
-/*    let tempOpenWeather = await axios.get(urlOpenWeather).then(response => {
+    let tempOpenWeather = await axios.get(urlOpenWeather).then(response => {
         return response.data.main.temp
     }).catch(error => {
         console.error("Errore! Non sono riuscito a fare la richiesta a OpenWeatherMap")
-    })*/
-        
+    })
+
     let point = new Point('measurement')
-        .tag('id', 'esp1')
-        .tag('gps', 'BO')
-        .floatField('temperature', parseFloat(message.temperature))
-        .floatField('humidity', parseFloat(message.humidity))
-        .floatField('gas', parseFloat(message.gas))
-        .floatField('aqi', parseFloat(message.aqi))
-        .floatField('wifi_signal', parseFloat(message.wifi_signal))
-        //.floatField('tempOpenWeather', tempOpenWeather)
+        .tag('id', message.id)
+        .tag('gps', message.lat + "," + message.lon )
+        .floatField('temperature', parseFloat(message.temperature).toFixed(2))
+        .floatField('humidity', parseFloat(message.humidity).toFixed(2))
+        .floatField('gas', parseFloat(message.gas).toFixed(2))
+        .floatField('aqi', parseFloat(message.aqi).toFixed(2))
+        .floatField('wifi_signal', parseFloat(message.wifi_signal).toFixed(2))
+        .floatField('tempOpenWeather', tempOpenWeather)
 
     writeClient.writePoint(point)
 })

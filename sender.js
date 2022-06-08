@@ -1,3 +1,6 @@
+/*** Per ora non ci serve più, inviamo i dati dall'esp323 ***/
+
+/*
 require('dotenv').config();
 let variables = process.env
 
@@ -9,8 +12,8 @@ const connectUrl = `mqtt://${host}:${port}`
 const clientMQTT = mqtt.connect(connectUrl, {
     clean: true,
     connectTimeout: 4000,
-    username: 'luca',
-    password: 'public',
+    username: variables.USERNAME_MQTT,
+    password: variables.PASSWORD_MQTT,
     reconnectPeriod: 1000,
 })
 
@@ -54,4 +57,4 @@ function createMessage() {
         '"gas": "' + getRandomFloat(6, 300) + '",' +
         '"aqi": "' + getRandomFloat(-1, 1.3) + '",' +
         '"wifi_signal": "' + getRandomFloat(6, 300) + '"}'
-}
+}*/
