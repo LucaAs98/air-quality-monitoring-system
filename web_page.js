@@ -27,6 +27,19 @@ admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     databaseURL: "https://progettoiot2022-default-rtdb.europe-west1.firebasedatabase.app"
 });
+//MQTT
+const mqtt = require('mqtt')
+const host = variables.HOST_MQTT
+const port = variables.PORT_MQTT
+const connectUrl = `mqtt://${host}:${port}`
+const clientMQTT = mqtt.connect(connectUrl, {
+    clean: true,
+    connectTimeout: 4000,
+    username: variables.USERNAME_MQTT,
+    password: variables.PASSWORD_MQTT,
+    reconnectPeriod: 1000,
+})
+const topics = ["device/parameters/"]
 
 //INFLUXDB
 const token = variables.TOKEN_INFLUX
@@ -113,6 +126,15 @@ app.post("/update_device", async (req, res) => {
     };
 
     const request = await db.collection('device').doc(id).update(data)
+
+    clientMQTT.publish(topics[0] + id, createMessage(data.protocol, data.sample_frequency, data.max_gas_value, data.min_gas_value), {
+        qos: 0,
+        retain: false
+    }, (error) => {
+        if (error) {
+            console.error(error)
+        }
+    })
 });
 
 //Rimuoviamo un device
@@ -138,6 +160,13 @@ async function getDevices() {
     })
 
     return arrayESP32
+}
+
+function createMessage(protocol, sample_frequency, max_gas, min_gas) {
+    return '{ \"protocol\": \"' + protocol.trim() + '\",' +
+        '\"sample_frequency\":' + sample_frequency + ',' +
+        '\"max_gas\":' + max_gas + ',' +
+        '\"min_gas\":' + min_gas + '}'
 }
 
 /*

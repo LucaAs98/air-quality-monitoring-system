@@ -223,25 +223,19 @@ async function removeEsp32(res_firestore) {
 }
 
 function dataInfluxIDFormat(dataToFormat, id) {
-    let newData = {}
-    if (dataToFormat.length > 0) {
-        let temperature = dataToFormat.filter(obj => obj.field === "temperature")[0]
-        let humidity = dataToFormat.filter(obj => obj.field === "humidity")[0]
-        let aqi = dataToFormat.filter(obj => obj.field === "aqi")[0]
+    let temperature = "No data"
+    let humidity = "No data"
+    let aqi = "No data"
 
-        newData = {
-            id: id,
-            temperature: temperature.value.toFixed(2),
-            humidity: humidity.value.toFixed(2),
-            aqi: aqi.value.toFixed(2)
-        }
-    } else {
-        newData = {
-            id: id,
-            temperature: "No data",
-            humidity: "No data",
-            aqi: "No data",
-        }
+    if (dataToFormat.length > 0) {
+        temperature = dataToFormat.filter(obj => obj.field === "temperature")[0].value.toFixed(2)
+        humidity = dataToFormat.filter(obj => obj.field === "humidity")[0].value.toFixed(2)
+        aqi = dataToFormat.filter(obj => obj.field === "aqi")[0].value.toFixed(2)
     }
-    return newData
+    return {
+        id: id,
+        temperature: temperature,
+        humidity: humidity,
+        aqi: aqi,
+    }
 }

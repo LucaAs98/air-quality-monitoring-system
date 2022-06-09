@@ -1,6 +1,6 @@
 /*** Per ora non ci serve più, inviamo i dati dall'esp323 ***/
 
-/*
+
 require('dotenv').config();
 let variables = process.env
 
@@ -20,7 +20,7 @@ const clientMQTT = mqtt.connect(connectUrl, {
 //Quando si connette iniziamo a pubblicare sui topic che ci interessano
 clientMQTT.on('connect', () => {
     console.log("Connected")
-    const topic1 = "sensor/values"
+    const topic1 = "device/parameters"
     const topics = [topic1]
 
     pubblica(topics)
@@ -51,10 +51,8 @@ function getRandomFloat(min, max) {
 }
 
 function createMessage() {
-    return '{' +
-        '"temperature": "' + getRandomFloat(6, 300) + '",' +
-        '"humidity": "' + getRandomFloat(6, 300) + '",' +
-        '"gas": "' + getRandomFloat(6, 300) + '",' +
-        '"aqi": "' + getRandomFloat(-1, 1.3) + '",' +
-        '"wifi_signal": "' + getRandomFloat(6, 300) + '"}'
-}*/
+    return '{ \"protocol\": \"MQTT\",' +
+        '\"sample_frequency\": 2000,' +
+        '\"max_gas\": 3,' +
+        '\"min_gas\": 0 }'
+}

@@ -45,13 +45,17 @@ clientMQTT.on('message', async (topic, payload) => {
 
     let point = new Point('measurement')
         .tag('id', message.id)
-        .tag('gps', message.lat + "," + message.lon )
+        .tag('gps', message.lat + "," + message.lon)
         .floatField('temperature', parseFloat(message.temperature).toFixed(2))
         .floatField('humidity', parseFloat(message.humidity).toFixed(2))
         .floatField('gas', parseFloat(message.gas).toFixed(2))
-        .floatField('aqi', parseFloat(message.aqi).toFixed(2))
+        //.floatField('aqi', parseFloat(message.aqi).toFixed(2))
         .floatField('wifi_signal', parseFloat(message.wifi_signal).toFixed(2))
         .floatField('tempOpenWeather', tempOpenWeather)
+    if(message.aqi !== undefined){
+        point.floatField('aqi', parseFloat(message.aqi).toFixed(2))
+    }
+
 
     writeClient.writePoint(point)
 })
@@ -60,6 +64,7 @@ clientMQTT.on('message', async (topic, payload) => {
 clientMQTT.on('connect', () => {
     console.log("Connected")
     const topic1 = "sensor/values"
+    const topic2 = "device/parameters"
     const topics = [topic1]
 
     clientMQTT.subscribe(topics, () => {
