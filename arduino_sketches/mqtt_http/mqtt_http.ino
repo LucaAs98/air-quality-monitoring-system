@@ -1,11 +1,21 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include <HTTPClient.h>
 
 // WiFi
 const char *ssid = "Vodafone-C02090047"; // Enter your WiFi name
 const char *password = "ERxFJfcyc3rtpY3H";  // Enter WiFi password
 
+//HTTP
+//Your Domain name with URL path or IP address with path
+String serverName = "http://192.168.1.7:3000/sensordata";
+HTTPClient http;
+
+//Costanti
+#define MQTT 0
+#define HTTP 1
+#define COAP 2
 
 //Values
 const float lat = 44.495;
@@ -13,7 +23,7 @@ const float lon = 11.386;
 String client_id = "esp32_luca";
 const int n_measure_aqi = 5;
 int current_measure = 0;
-const char *protocol = "MQTT";
+int protocol = MQTT;
 float MAX_GAS_VALUE = 3;
 float MIN_GAS_VALUE = 1;
 int SAMPLE_FREQUENCY = 2000;
@@ -33,16 +43,18 @@ StaticJsonDocument<200> doc;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-void setup() {
-  // Set software serial baud to 115200;
-  Serial.begin(115200);
-  // connecting to a WiFi network
+void initWiFi() {
+  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi ..");
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.println("Connecting to WiFi..");
+    Serial.print('.');
+    delay(1000);
   }
-  Serial.println("Connected to the WiFi network");
+  Serial.println(WiFi.localIP());
+}
+
+void initMQTT() {
   //connecting to a mqtt broker
   client.setServer(mqtt_broker, mqtt_port);
   client.setCallback(callback);
@@ -59,6 +71,23 @@ void setup() {
   }
   // publish and subscribe
   client.subscribe(topicReceive);
+}
+
+void initHTTP() {
+  // Your Domain name with URL path or IP address with path
+  http.begin(serverName);
+  http.addHeader("Content-Type", "application/json");
+}
+
+void setup() {
+  // Set software serial baud to 115200;
+  Serial.begin(115200);
+  initWiFi();
+
+  initMQTT();
+
+  initHTTP();
+
 }
 
 void callback(char *topic, byte *payload, unsigned int length) {
@@ -86,7 +115,7 @@ void callback(char *topic, byte *payload, unsigned int length) {
   MAX_GAS_VALUE = doc["max_gas"];
   MIN_GAS_VALUE = doc["min_gas"];
   SAMPLE_FREQUENCY = doc["sample_frequency"];
-  Serial.print(SAMPLE_FREQUENCY);
+  Serial.print(protocol);
 
   Serial.println();
   Serial.println("-----------------------");
@@ -112,37 +141,64 @@ float avg(float * array, int len) {
 }
 
 void loop() {
-  float temperature = random(6, 300) / 100.0;
-  float humidity = random(6, 300) / 100.0;
-  float gas = random(6, 300) / 100.0;
-  arrGas[current_measure] = gas;
-  int aqi = 2;
-  String stringaAQI = String("");
-  float wifi_signal = WiFi.RSSI();
+  if (WiFi.status() == WL_CONNECTED) {
 
-  Serial.println();
-  Serial.print("Current_Measure --> ");
-  Serial.print(current_measure);
-  if (current_measure < n_measure_aqi - 1) {
-    current_measure += 1;
-  } else {
-    current_measure = 0;
+    float temperature = random(6, 300) / 100.0;
+    float humidity = random(6, 300) / 100.0;
+    float gas = random(6, 300) / 100.0;
+    arrGas[current_measure] = gas;
+    int aqi = 2;
+    String stringaAQI = String("");
+    float wifi_signal = WiFi.RSSI();
+
     Serial.println();
-    Serial.print("AQI --> ");
-    aqi = calcoloAQI(MAX_GAS_VALUE, MIN_GAS_VALUE, arrGas);
-    stringaAQI = String(", \"aqi\":") + aqi;
-  }
+    Serial.print("Current_Measure --> ");
+    Serial.print(current_measure);
 
-  String messaggio = String("{\"temperature\":") + temperature +
-                     String(", \"humidity\":") + humidity +
-                     String(", \"gas\":") + gas +
-                     String(", \"wifi_signal\":") + wifi_signal +
-                     String(", \"id\":\"") + client_id + String("\"") +
-                     String(", \"lat\":") + lat +
-                     String(", \"lon\": ") + lon +
-                     stringaAQI +
-                     String("}");
-  client.publish(topic, messaggio.c_str());
+    if (current_measure < n_measure_aqi - 1) {
+      current_measure += 1;
+    } else {
+      current_measure = 0;
+      Serial.println();
+      Serial.print("AQI --> ");
+      aqi = calcoloAQI(MAX_GAS_VALUE, MIN_GAS_VALUE, arrGas);
+      stringaAQI = String(", \"aqi\":") + aqi;
+    }
+
+    String messaggio = String("{\"temperature\":") + temperature +
+                       String(", \"humidity\":") + humidity +
+                       String(", \"gas\":") + gas +
+                       String(", \"wifi_signal\":") + wifi_signal +
+                       String(", \"id\":\"") + client_id + String("\"") +
+                       String(", \"lat\":") + lat +
+                       String(", \"lon\": ") + lon +
+                       stringaAQI +
+                       String("}");
+
+    Serial.println(protocol);
+    Serial.println(protocol == MQTT);
+    Serial.println(protocol == HTTP);
+    if (protocol == MQTT) {
+      client.publish(topic, messaggio.c_str());
+
+    } else if (protocol == HTTP) {
+       initHTTP();
+      // Send HTTP POST request
+      int httpResponseCode = http.POST(messaggio);
+      if (httpResponseCode > 0) {
+        Serial.print("HTTP Response code: ");
+        Serial.println(httpResponseCode);
+      }
+      else {
+        Serial.print("Error code: ");
+        Serial.println(httpResponseCode);
+      }
+      // Free resources
+      http.end();
+    }
+  } else {
+    Serial.println("WiFi Disconnected");
+  }
   client.loop();
   delay(SAMPLE_FREQUENCY);
 }

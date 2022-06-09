@@ -32,8 +32,25 @@ let writeClient = clientInflux.getWriteApi(org, bucket, 'ns')
 clientMQTT.on('message', async (topic, payload) => {
     console.log('MQTT -> ', topic, payload.toString())
     let message = JSON.parse(payload.toString())
+    await pointCreation(message)
+})
 
-    //OpenWeather
+//Quando si connette si sottoscrive ai due topic a cui siamo interessati
+clientMQTT.on('connect', () => {
+    console.log("Connected")
+    const topic1 = "sensor/values"
+    const topic2 = "device/parameters"
+    const topics = [topic1]
+
+    clientMQTT.subscribe(topics, () => {
+        console.log(`Subscribe to topics '${topics}'`)
+    })
+})
+
+/** HTTP **/
+async function pointCreation(message) {
+    console.log(message)
+    //OpenWeather Data
     const urlOpenWeather = 'https://api.openweathermap.org/data/2.5/weather?lat=' + message.lat + '&lon=' + message.lon + '&units=metric&appid=3e877f0f053735d3715ca7e534ca8efa'
 
     //Prendiamo la temperatura da openWeatherMap
@@ -49,35 +66,11 @@ clientMQTT.on('message', async (topic, payload) => {
         .floatField('temperature', parseFloat(message.temperature).toFixed(2))
         .floatField('humidity', parseFloat(message.humidity).toFixed(2))
         .floatField('gas', parseFloat(message.gas).toFixed(2))
-        //.floatField('aqi', parseFloat(message.aqi).toFixed(2))
+       // .floatField('aqi', parseFloat(message.aqi).toFixed(2))
         .floatField('wifi_signal', parseFloat(message.wifi_signal).toFixed(2))
         .floatField('tempOpenWeather', tempOpenWeather)
-    if(message.aqi !== undefined){
-        point.floatField('aqi', parseFloat(message.aqi).toFixed(2))
-    }
 
 
     writeClient.writePoint(point)
-})
-
-//Quando si connette si sottoscrive ai due topic a cui siamo interessati
-clientMQTT.on('connect', () => {
-    console.log("Connected")
-    const topic1 = "sensor/values"
-    const topic2 = "device/parameters"
-    const topics = [topic1]
-
-    clientMQTT.subscribe(topics, () => {
-        console.log(`Subscribe to topics '${topics}'`)
-    })
-})
-
-//Loop dove andiamo a prendere tutto ciò che dobbiamo poi mandare a ThingSpeak
-const SAMPLE_FREQUENCY = 2000
-
-
-//Calcolo media
-function average(array) {
-    const sum = array.reduce((a, b) => a + b, 0);
-    return (sum / array.length) || 0; //Average
 }
+module.exports = pointCreation

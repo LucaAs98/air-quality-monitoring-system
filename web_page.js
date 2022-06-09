@@ -5,6 +5,9 @@ const express = require("express");
 const open = require('open');
 const app = express();
 
+const pointCreation = require("./receiver")
+
+
 app.set('views', __dirname + '/');
 // Parse URL-encoded bodies (as sent by HTML forms)
 app.use(express.urlencoded());
@@ -12,6 +15,7 @@ app.engine('html', require('ejs').renderFile);
 app.set('view engine', 'ejs');
 
 app.use(express.static(__dirname));
+app.use(express.json());
 
 /* Stiamo in ascolto su "localhost:3000". */
 app.listen(3000, () => {
@@ -142,6 +146,12 @@ app.post("/remove_device", async (req, res) => {
     const request = await db.collection('device').doc(req.body.id).delete()
 })
 
+//Invio dati tramite HTTP
+app.post('/sensordata', async function (req, res) {
+    let message = req.body
+    await pointCreation(message)
+    res.end();
+});
 
 async function getDevices() {
     const devicesCollection = await db.collection('device').get();
@@ -163,41 +173,23 @@ async function getDevices() {
 }
 
 function createMessage(protocol, sample_frequency, max_gas, min_gas) {
-    return '{ \"protocol\": \"' + protocol.trim() + '\",' +
+    return '{ \"protocol\": \"' + getProtocol(protocol.trim()) + '\",' +
         '\"sample_frequency\":' + sample_frequency + ',' +
         '\"max_gas\":' + max_gas + ',' +
         '\"min_gas\":' + min_gas + '}'
 }
 
-/*
-
-async function getInfluxData() {
-    let fluxQuery = `from(bucket: "iotProject2022")
-    |> range(start: -10d)
- |> group(columns: ["id", "_field"])
- |> mean()`
-
-    let data = []
-
-    await queryClient.queryRows(fluxQuery, {
-        next: (row, tableMeta) => {
-            const tableObject = tableMeta.toObject(row)
-            data.push(tableObject)
-        },
-        error: (error) => {
-            console.error('\nError', error)
-        },
-        complete: () => {
-            //console.log(data)
-            console.log('\nSuccess')
-            console.log("primo" + data)
-
-        },
-    })
-    console.log("secondo")
-    return data
+function getProtocol(protocol) {
+    console.log(protocol)
+    switch (protocol) {
+        case "MQTT":
+            return 0;
+        case "HTTP":
+            return 1;
+        case "COAP":
+            return 2;
+    }
 }
-*/
 
 function influxDataFormat(data) {
     let newData = []
