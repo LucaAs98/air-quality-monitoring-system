@@ -194,7 +194,7 @@ function creaDivCarta(dataFirestore, dataInflux) {
                   </div>
                   <div class="modal-footer">
                     <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-success" id="change_parameters_${dataFirestore.id}">Cambia parametri</button>
+                    <button type="button" class="btn btn-success" id="change_parameters_${dataFirestore.id}">Cambia parametri</button>
                   </div>
                 </div>
             </form>
@@ -203,69 +203,75 @@ function creaDivCarta(dataFirestore, dataInflux) {
     </div>`
 }
 
+
 //Settiamo il comportamento del modal del cambio dei parametri per ciascun esp
 function setChangeParamBehaviour(dataFirestore) {
     //Comportamento del modal del cambio parametri
     let modal = document.getElementById(`modal${dataFirestore.id}`);
 
     modal.addEventListener('show.bs.modal', function (event) {
-        //Quando clicchiamo un elemento della dropdown cambiamo il nome di essa
-        $(`.dropdown-item`).on('click', function () {
-            let protocol = $(this).text().trim()
-            $(`#protocol_dropdown_${dataFirestore.id}`).text(protocol)
-        })
+            //Quando clicchiamo un elemento della dropdown cambiamo il nome di essa
+            $(`.dropdown-item`).on('click', function () {
+                let protocol = $(this).text().trim()
+                $(`#protocol_dropdown_${dataFirestore.id}`).text(protocol)
+            })
 
-        /* Controlliamo che i campi siano correttamente completati. */
-        $(`#modal-form-${dataFirestore.id}`).validate({
-            errorClass: "my-error-class",
-            rules: {
-                max_gas: {
-                    required: true,
-                    number: true
+
+            /* Controlliamo che i campi siano correttamente completati. */
+            $(`#modal-form-${dataFirestore.id}`).validate({
+                errorClass: "my-error-class",
+                rules: {
+                    max_gas: {
+                        required: true,
+                        number: true
+                    },
+                    min_gas: {
+                        required: true,
+                        number: true
+                    },
+                    sample_frequency: {
+                        required: true,
+                        number: true
+                    },
                 },
-                min_gas: {
-                    required: true,
-                    number: true
+                messages: {
+                    max_gas: {
+                        required: "Please enter the max gas value",
+                        number: "Enter a number please"
+                    },
+                    min_gas: {
+                        required: "Please enter the min gas value",
+                        number: "Enter a number please"
+                    },
+                    sample_frequency: {
+                        required: "Please enter the sample frequency value",
+                        number: "Enter a number please"
+                    }
                 },
-                sample_frequency: {
-                    required: true,
-                    number: true
-                },
-            },
-            messages: {
-                max_gas: {
-                    required: "Please enter the max gas value",
-                    number: "Enter a number please"
-                },
-                min_gas: {
-                    required: "Please enter the min gas value",
-                    number: "Enter a number please"
-                },
-                sample_frequency: {
-                    required: "Please enter the sample frequency value",
-                    number: "Enter a number please"
+            })
+            $(`#change_parameters_${dataFirestore.id}`).click(async function () {
+                if (!$(`#modal-form-${dataFirestore.id}`).valid()) { // Not Valid
+                    return false;
+                } else {
+                    // Aggiorniamo il contenuto del modal
+                    let modalBodyInputMax = modal.querySelector(`.modal-body input#max_gas_value_${dataFirestore.id}`);
+                    let modalBodyInputMin = modal.querySelector(`.modal-body input#min_gas_value_${dataFirestore.id}`);
+                    let modalBodyInputSample = modal.querySelector(`.modal-body input#sample_frequency_value_${dataFirestore.id}`);
+                    let modalBodyInputProtocol = modal.querySelector(`.modal-body button#protocol_dropdown_${dataFirestore.id}`);
+
+                    let data = {
+                        id: dataFirestore.id,
+                        max: modalBodyInputMax.value,
+                        min: modalBodyInputMin.value,
+                        sample_frequency: modalBodyInputSample.value,
+                        protocol: modalBodyInputProtocol.textContent.trim()
+                    }
+
+                    $.post("/update_device", data);
+                    await new Promise(r => setTimeout(r, 500));
+                    window.location.reload();
                 }
-            },
-            //Se tutto va bene inviamo i dati a firebase
-            submitHandler: async function (form, e) {
-                // Aggiorniamo il contenuto del modal
-                let modalBodyInputMax = modal.querySelector(`.modal-body input#max_gas_value_${dataFirestore.id}`);
-                let modalBodyInputMin = modal.querySelector(`.modal-body input#min_gas_value_${dataFirestore.id}`);
-                let modalBodyInputSample = modal.querySelector(`.modal-body input#sample_frequency_value_${dataFirestore.id}`);
-                let modalBodyInputProtocol = modal.querySelector(`.modal-body button#protocol_dropdown_${dataFirestore.id}`);
-
-                let data = {
-                    id: dataFirestore.id,
-                    max: modalBodyInputMax.value,
-                    min: modalBodyInputMin.value,
-                    sample_frequency: modalBodyInputSample.value,
-                    protocol: modalBodyInputProtocol.textContent.trim()
-                }
-
-                $.post("/update_device", data);
-                await new Promise(r => setTimeout(r, 500));
-                window.location.reload();
-            }
-        });
-    })
+            });
+        }
+    );
 }

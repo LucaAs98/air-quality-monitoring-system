@@ -70,8 +70,11 @@ function setAddDeviceBehaviour(){
                     number: "Enter a number please"
                 }
             },
-            //Se tutto va bene inviamo i dati a firebase
-            submitHandler: async function (form, e) {
+        });
+        $(`#add_new_device`).click(async function () {
+            if (!$("#modal-form").valid()) { // Not Valid
+                return false;
+            } else {
                 if (window.arrayESP32.some(e => e.id === modalBodyInputTitle.value)) {
                     $("#errore_id_presente").show()
                 } else {
