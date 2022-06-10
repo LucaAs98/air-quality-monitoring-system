@@ -1,19 +1,16 @@
+/** Inizializzazione NODEJS **/
 require('dotenv').config();
 let variables = process.env
-
+const pointCreation = require("./receiver")
 const express = require("express");
 const open = require('open');
 const app = express();
 
-const pointCreation = require("./receiver")
-
-
 app.set('views', __dirname + '/');
-// Parse URL-encoded bodies (as sent by HTML forms)
-app.use(express.urlencoded());
 app.engine('html', require('ejs').renderFile);
 app.set('view engine', 'ejs');
 
+app.use(express.urlencoded());
 app.use(express.static(__dirname));
 app.use(express.json());
 
@@ -22,16 +19,16 @@ app.listen(3000, () => {
     console.log("Application started and Listening on port 3000");
 });
 
-
-// Import the functions you need from the SDKs you need
+/** Inizializzazione FIREBASE **/
 let admin = require("firebase-admin");
 let serviceAccount = require("./progettoiot2022-firebase-adminsdk-hoxdu-085c6305e8.json");
-
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     databaseURL: "https://progettoiot2022-default-rtdb.europe-west1.firebasedatabase.app"
 });
-//MQTT
+let db = admin.firestore();
+
+/** Inizializzazione MQTT **/
 const mqtt = require('mqtt')
 const host = variables.HOST_MQTT
 const port = variables.PORT_MQTT
@@ -43,22 +40,17 @@ const clientMQTT = mqtt.connect(connectUrl, {
     password: variables.PASSWORD_MQTT,
     reconnectPeriod: 1000,
 })
-const topics = ["device/parameters/"]
+const topics = ["device/parameters/"]   //Topic per inviare all'esp i parametri da cambiare.
 
-//INFLUXDB
+/** Inizializzazione INFLUXDB **/
 const token = variables.TOKEN_INFLUX
 const url = variables.URL_INFLUX
-
 const {InfluxDB, Point} = require('@influxdata/influxdb-client')
 const clientInflux = new InfluxDB({url, token})
-
-let org = process.env.ORG_INFLUX
-let bucket = process.env.BUCKET_INFLUX
-
+let org = variables.ORG_INFLUX
+let bucket = variables.BUCKET_INFLUX
 let queryClient = clientInflux.getQueryApi(org)
 
-// As an admin, the app has access to read and write all data, regardless of Security Rules
-let db = admin.firestore();
 
 /*** Richieste GET ***/
 /* Ad URL "/home" rendirizziamo "home.html". Questo a sua volta chiamerà lo script "home.js". */
@@ -66,6 +58,7 @@ app.get("/home", (req, res) => {
     res.render("home.html");
 });
 
+/* Ad URL "/devices" chiediamo di prendere tutti i device registrati su firebase. */
 app.get("/devices", async (req, res) => {
     let errore;
     let response = await getDevices().catch((err) => errore = err);
@@ -73,16 +66,19 @@ app.get("/devices", async (req, res) => {
     if (!response) {
         console.log('Error, i cannot load the devices.' + '\n' + errore);
     } else {
-        res.json(response);
+        res.json(response);     //Se tutto va bene li restituiamo
     }
 });
 
+/* Ad URL "/get_influx_data" chiediamo di prendere i dati da influxdv. */
 app.get("/get_influx_data", async (req, res) => {
-    let fluxQuery = `from(bucket: "iotProject2022")
-    |> range(start: -10d)
- |> group(columns: ["id", "_field"])
- |> mean()`
+    let fluxQuery =
+        `from(bucket: "${variables.BUCKET_INFLUX}")
+                |> range(start: -10d)
+                |> group(columns: ["id", "_field"])
+                |> mean()`
 
+    //Salviamo in "data" tutti i dati che ci servono da influx
     let data = []
 
     await queryClient.queryRows(fluxQuery, {
@@ -93,6 +89,7 @@ app.get("/get_influx_data", async (req, res) => {
         error: (error) => {
             console.log('Error, i cannot load influx data.' + ' -> ' + error);
         },
+        //Quando abbiamo completato formattiamo i dati come vogliamo e li restituiamo
         complete: () => {
             data = influxDataFormat(data)
             res.json(data);
