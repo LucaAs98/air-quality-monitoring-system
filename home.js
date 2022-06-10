@@ -13,6 +13,7 @@ $.getScript("./get_devices.js")
         console.log("Error in loading devices");
     });
 
+//Settiamo come si deve comportare la parte dell'aggiunta di un device
 setAddDeviceBehaviour();
 
 //Quando clicchiamo un elemento della dropdown per il protocollo cambiamo il nome di essa
@@ -22,7 +23,7 @@ $(`.dropdown-item`).on('click', function () {
 })
 
 //Setta il comportamento del modal che si apre quando aggiungiamo un device nella webpage.
-function setAddDeviceBehaviour(){
+function setAddDeviceBehaviour() {
     //Comportamento del modal che si apre quando aggiungiamo un device nella webpage.
     let modal = document.getElementById(`modal_add_device`);
     modal.addEventListener('show.bs.modal', function (event) {
@@ -71,10 +72,13 @@ function setAddDeviceBehaviour(){
                 }
             },
         });
+        /* Abbiamo dovuto separare la validate dalla submit per poter mettere un piccolo delay e dare il tempo
+         * di salvare i dati prima di ricaricare la pagina. */
         $(`#add_new_device`).click(async function () {
             if (!$("#modal-form").valid()) { // Not Valid
                 return false;
             } else {
+                //Se stiamo già visualizzando questo device allora diamo un errore
                 if (window.arrayESP32.some(e => e.id === modalBodyInputTitle.value)) {
                     $("#errore_id_presente").show()
                 } else {
@@ -85,7 +89,9 @@ function setAddDeviceBehaviour(){
                         sample_frequency: modalBodyInputSample.value,
                         protocol: modalBodyInputProtocol.textContent
                     }
+                    //Aggiungiamo il nuovo device a firebase
                     $.post("/add_device", data);
+                    //Piccola sleep per avere il tempo di aggiornare i dati e poter ricaricare infine la pagina
                     await new Promise(r => setTimeout(r, 500));
                     window.location.reload();
                 }

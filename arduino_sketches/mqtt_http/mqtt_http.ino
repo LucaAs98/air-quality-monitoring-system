@@ -116,13 +116,11 @@ void callback(char *topic, byte *payload, unsigned int length) {
   MIN_GAS_VALUE = doc["min_gas"];
   SAMPLE_FREQUENCY = doc["sample_frequency"];
   Serial.println("New values:");
-  Serial.println("Protocol:" + protocol);
+  Serial.println("Protocol:" + String(protocol));
   Serial.println("MAX_GAS_VALUE:" + String(MAX_GAS_VALUE));
   Serial.println("MIN_GAS_VALUE:" + String(MIN_GAS_VALUE));
   Serial.println("SAMPLE_FREQUENCY:" + String(SAMPLE_FREQUENCY));
-
   Serial.println();
-  Serial.println("-----------------------");
 }
 
 int calcoloAQI(float max, float min, float * arrGas, int *counter) {

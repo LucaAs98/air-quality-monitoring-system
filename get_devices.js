@@ -111,11 +111,17 @@ function dataInfluxIDFormat(dataToFormat, id) {
 
     //Se invece abbiamo i dati per tale id li settiamo
     if (dataToFormat.length > 0) {
-        newData.temperature = dataToFormat.filter(obj => obj.field === "temperature")[0].value.toFixed(2)
-        newData.humidity = dataToFormat.filter(obj => obj.field === "humidity")[0].value.toFixed(2)
-        newData.aqi = dataToFormat.filter(obj => obj.field === "aqi")[0].value.toFixed(2)
-    }
+        let tempInData = dataToFormat.filter(obj => obj.field === "temperature")[0]
+        let humInData = dataToFormat.filter(obj => obj.field === "humidity")[0]
+        let aqiInData = dataToFormat.filter(obj => obj.field === "aqi")[0]
 
+        if (tempInData !== undefined)
+            newData.temperature = tempInData.value.toFixed(2)
+        if (humInData !== undefined)
+            newData.humidity = humInData.value.toFixed(2)
+        if (aqiInData !== undefined)
+            newData.aqi = aqiInData.value.toFixed(2)
+    }
     return newData
 }
 
@@ -249,16 +255,19 @@ function setChangeParamBehaviour(dataFirestore) {
                     }
                 },
             })
+            /* Abbiamo dovuto separare la validate dalla submit per poter mettere un piccolo delay e dare il tempo
+            * di salvare i dati prima di ricaricare la pagina. */
             $(`#change_parameters_${dataFirestore.id}`).click(async function () {
                 if (!$(`#modal-form-${dataFirestore.id}`).valid()) { // Not Valid
                     return false;
                 } else {
-                    // Aggiorniamo il contenuto del modal
+                    // Aggiorniamo il contenuto del modal, prendiamo i campi
                     let modalBodyInputMax = modal.querySelector(`.modal-body input#max_gas_value_${dataFirestore.id}`);
                     let modalBodyInputMin = modal.querySelector(`.modal-body input#min_gas_value_${dataFirestore.id}`);
                     let modalBodyInputSample = modal.querySelector(`.modal-body input#sample_frequency_value_${dataFirestore.id}`);
                     let modalBodyInputProtocol = modal.querySelector(`.modal-body button#protocol_dropdown_${dataFirestore.id}`);
 
+                    //Estraiamo i dati dai vari campi e creiamo l'oggetto con i nuovi valori
                     let data = {
                         id: dataFirestore.id,
                         max: modalBodyInputMax.value,
@@ -267,7 +276,9 @@ function setChangeParamBehaviour(dataFirestore) {
                         protocol: modalBodyInputProtocol.textContent.trim()
                     }
 
+                    //Mandiamo i nuovi dati sia a firebase che all'esp32
                     $.post("/update_device", data);
+                    //Piccola sleep per avere il tempo di aggiornare i dati e poter ricaricare infine la pagina
                     await new Promise(r => setTimeout(r, 500));
                     window.location.reload();
                 }

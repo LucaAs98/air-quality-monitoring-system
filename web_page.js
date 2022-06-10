@@ -70,7 +70,7 @@ app.get("/devices", async (req, res) => {
     }
 });
 
-/* Ad URL "/get_influx_data" chiediamo di prendere i dati da influxdv. */
+/* Ad URL "/get_influx_data" chiediamo di prendere i dati da influxdB. */
 app.get("/get_influx_data", async (req, res) => {
     let fluxQuery =
         `from(bucket: "${variables.BUCKET_INFLUX}")
@@ -81,6 +81,7 @@ app.get("/get_influx_data", async (req, res) => {
     //Salviamo in "data" tutti i dati che ci servono da influx
     let data = []
 
+    //Scorriamo tutti i risultati della query
     await queryClient.queryRows(fluxQuery, {
         next: (row, tableMeta) => {
             const tableObject = tableMeta.toObject(row)
@@ -99,6 +100,7 @@ app.get("/get_influx_data", async (req, res) => {
 
 /*** Richieste POST **/
 
+//A richiesta post della home renidirizziamo l'html
 app.post("/home", (req, res) => {
     res.render("home.html");
 });
@@ -113,6 +115,7 @@ app.post("/add_device", async (req, res) => {
         sample_frequency: req.body.sample_frequency,
     };
 
+    //Creaimo un doc chiamato con l'id e salviamo all'interno di esso tutti i dati relativi a quel determinato device
     const request = await db.collection('device').doc(id).set(data)
 });
 
@@ -126,8 +129,10 @@ app.post("/update_device", async (req, res) => {
         sample_frequency: req.body.sample_frequency,
     };
 
+    //Aggiorniamo il device a quel determinato id
     const request = await db.collection('device').doc(id).update(data)
 
+    //Dopo aver aggiornato i dati su firestore andiamo a comunicarli anche all'esp32
     clientMQTT.publish(topics[0] + id, createMessage(data.protocol, data.sample_frequency, data.max_gas_value, data.min_gas_value), {
         qos: 0,
         retain: false
@@ -138,22 +143,24 @@ app.post("/update_device", async (req, res) => {
     })
 });
 
-//Rimuoviamo un device
+//Rimuoviamo un device togliendolo da firestore in modo tale da non poterlo più visualizzare nella webpage
 app.post("/remove_device", async (req, res) => {
     const request = await db.collection('device').doc(req.body.id).delete()
 })
 
-//Invio dati tramite HTTP
+//Riceviamo i dati tramite HTTP dall'esp, creiamo quindi il punto e lo spediamo ad InfluxDB
 app.post('/sensordata', async function (req, res) {
     let message = req.body
     await pointCreation(message)
     res.end();
 });
 
+//Metodo che prende tutti i device da firebase
 async function getDevices() {
     const devicesCollection = await db.collection('device').get();
     let arrayESP32 = [];
 
+    //Per ognuno di essi assegnamo tutti i parametri necessari.
     devicesCollection.forEach((result) => {
         arrayESP32.push({
             id: result.id,
@@ -161,14 +168,16 @@ async function getDevices() {
             min: result.data().min_gas_value,
             sample_frequency: result.data().sample_frequency,
             protocol: result.data().protocol,
-            lat: 41,
-            long: 11
+            lat: 44.490931818740,
+            long: 11.35460682369
         })
     })
 
+    //Restituiamo tutti i device
     return arrayESP32
 }
 
+//Funzione che crea il messagio da inviare all'esp32
 function createMessage(protocol, sample_frequency, max_gas, min_gas) {
     return '{ \"protocol\": \"' + getProtocol(protocol) + '\",' +
         '\"sample_frequency\":' + sample_frequency + ',' +
@@ -176,6 +185,8 @@ function createMessage(protocol, sample_frequency, max_gas, min_gas) {
         '\"min_gas\":' + min_gas + '}'
 }
 
+/* Funzione che dato il protocollo in stringa restituisce il suo numero corrispondente. Abbiamo fatto questo per prenderlo
+* più semplicemente dall'esp32 occupando anche meno memoria. */
 function getProtocol(protocol) {
     console.log(protocol)
     switch (protocol) {
@@ -188,6 +199,7 @@ function getProtocol(protocol) {
     }
 }
 
+//Formattiamo i dati di influx come vogliamo per poterli usare nel nostro codice
 function influxDataFormat(data) {
     let newData = []
     data.forEach(obj =>
