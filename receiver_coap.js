@@ -1,6 +1,6 @@
 //Inizializza COAP
 const coap = require('coap')
-const broker_address = "130.136.2.70"
+const broker_address = '192.168.1.16'
 
 //Loop dove andiamo a prendere tutto ciò che dobbiamo poi mandare a ThingSpeak
 const msIntervallo = 2000
@@ -18,34 +18,59 @@ let bucket = 'iotProject2022'
 let writeClient = clientInflux.getWriteApi(org, bucket, 'ns')
 
 
-setInterval(function () {
-    //Prendi da COAP
-    coap.createServer((req, res) => {
-        res.end('Hello ' + req.url.split('/')[1] + '\n')
-    }).listen(async () => {
-        const req = coap.request('coap://' + broker_address)
-        req.on('response', (res) => {
-            let message = JSON.parse(res.payload.toString())
-            console.log("COAP -> " + message)
+async function coapRequest(){
 
-            let point = new Point('measurement')
-                .tag('id', 'esp32_nostro')
-                .tag('gps', 'BO')
-                .floatField('temperature', parseFloat(message.temperature))
-                .floatField('humidity', parseFloat(message.humidity))
-                .floatField('gas', parseFloat(message.gas))
-                .floatField('aqi', parseFloat(message.aqi))
-                .floatField('wifi_signal', parseFloat(message.wifi_signal))
+    var options = {
+        host: broker_address,
+        port: 5683,
+        pathname: "/ciao",
+        method: 'get',
+        confirmable: 'true',
+        options: {
+            'Content-Format': 'application/json'
+        }
+    }
+    console.log("Sono qui!")
+    var req = await coap.request(options)
+    console.log("Richiesta fatta!")
 
-            writeClient.writePoint(point)
-            res.on('end', async () => {
-                process.exit(0)
-            })
-        })
-        req.end()
+    let jsonData
+
+    req.on('response', function (res) {
+        console.log('response code', res.code);
+        if (res.code !== '2.05') return process.exit(1);
+
+        res.on('data', function () {
+            console.log(res.payload)
+            jsonData = JSON.parse(res.payload)
+        });
+        res.on('end', function () {
+            if (res.code == '2.05') {
+                console.log('[coap] coap ready, request OK');
+                console.log(jsonData)
+                /*let point = new Point('measurement')
+                    .tag('id', 'esp32_nostro')
+                    .tag('gps', 'BO')
+                    .floatField('temperature', parseFloat(jsonData.temperature))
+                    .floatField('humidity', parseFloat(jsonData.humidity))
+                    .floatField('gas', parseFloat(jsonData.gas))
+                    .floatField('aqi', parseFloat(jsonData.aqi))
+                    .floatField('wifi_signal', parseFloat(jsonData.wifi_signal))
+                    .floatField('tempOpenWeather', 25.5)
+
+                console.log("Scritto!")
+                writeClient.writePoint(point)*/
+            } else {
+                console.log('[coap] coap res.code=' + res.code);
+            }
+        });
     })
-}, msIntervallo)
+    req.end();
 
+    setInterval(coapRequest, 5000);
+}
+
+coapRequest()
 
 /*//Calcolo media
 function average(array) {
