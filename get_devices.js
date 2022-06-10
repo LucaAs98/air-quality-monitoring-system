@@ -150,7 +150,7 @@ function aggiungiCarta(res_firestore, dataInflux) {
     modal.addEventListener('show.bs.modal', function (event) {
         //Quando clicchiamo un elemento della dropdown cambiamo il nome di essa
         $(`.dropdown-item`).on('click', function () {
-            let protocol = $(this).text()
+            let protocol = $(this).text().trim()
             $(`#protocol_dropdown_${res_firestore.id}`).text(protocol)
         })
 
@@ -198,7 +198,7 @@ function aggiungiCarta(res_firestore, dataInflux) {
                     max: modalBodyInputMax.value,
                     min: modalBodyInputMin.value,
                     sample_frequency: modalBodyInputSample.value,
-                    protocol: modalBodyInputProtocol.textContent
+                    protocol: modalBodyInputProtocol.textContent.trim()
                 }
 
                 $.post("/update_device", data);

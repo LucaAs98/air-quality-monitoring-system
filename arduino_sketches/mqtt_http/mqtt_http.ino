@@ -115,30 +115,71 @@ void callback(char *topic, byte *payload, unsigned int length) {
   MAX_GAS_VALUE = doc["max_gas"];
   MIN_GAS_VALUE = doc["min_gas"];
   SAMPLE_FREQUENCY = doc["sample_frequency"];
-  Serial.print(protocol);
+  Serial.println("New values:");
+  Serial.println("Protocol:" + protocol);
+  Serial.println("MAX_GAS_VALUE:" + String(MAX_GAS_VALUE));
+  Serial.println("MIN_GAS_VALUE:" + String(MIN_GAS_VALUE));
+  Serial.println("SAMPLE_FREQUENCY:" + String(SAMPLE_FREQUENCY));
 
   Serial.println();
   Serial.println("-----------------------");
 }
 
-int calcoloAQI(float max, float min, float * arrGas) {
+int calcoloAQI(float max, float min, float * arrGas, int *counter) {
   int aqi = 2;
-  float average = avg(arrGas, sizeof(arrGas));
+  float average = 0;
+  Serial.println("Counter in calcoloAQI --> " + String(*counter));
+  if (*counter < n_measure_aqi - 1) {
+    average = avg(arrGas, *counter + 1);
+    *counter += 1;
+  } else {
+    average = avg(arrGas, sizeof(arrGas));
+    if (*counter == ((n_measure_aqi * 2) - 1)) {
+      Serial.println("Ho fatto l'assegnamento");
+      *counter = n_measure_aqi;
+    } else {
+      *counter += 1;
+    }
+    Serial.println("Sto uscendo dall'else del calcoloAQI con counter --> " + String(*counter));
+  }
   if (average >= MAX_GAS_VALUE) {
     aqi = 0;
   } else if (MIN_GAS_VALUE <= average < MAX_GAS_VALUE) {
     aqi = 1;
   }
-  Serial.print(aqi);
+  Serial.println("AQI --> " + String(aqi));
   return aqi;
 }
 
 float avg(float * array, int len) {
+  Serial.println("Lunghezza array in avg --> " + String(len));
   long sum = 0L ;
   for (int i = 0 ; i < len ; i++)
-    sum += array [i] ;
+    sum += array[i] ;
   return  ((float) sum) / len ;
 }
+
+String creaMessaggio(float temperature, float humidity, float gas, int aqi, float wifi_signal) {
+  return String("{\"temperature\":") + temperature +
+         String(", \"humidity\":") + humidity +
+         String(", \"gas\":") + gas +
+         String(", \"wifi_signal\":") + wifi_signal +
+         String(", \"id\":\"") + client_id + String("\"") +
+         String(", \"lat\":") + lat +
+         String(", \"lon\": ") + lon +
+         String(", \"aqi\": ") + aqi +
+         String("}");
+}
+
+void stampaErroriHTTP(int httpResponseCode) {
+  if (httpResponseCode > 0) {
+    Serial.print("HTTP Response code: ");
+  } else {
+    Serial.print("Error code: ");
+  }
+  Serial.println(httpResponseCode);
+}
+
 
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
@@ -146,53 +187,24 @@ void loop() {
     float temperature = random(6, 300) / 100.0;
     float humidity = random(6, 300) / 100.0;
     float gas = random(6, 300) / 100.0;
-    arrGas[current_measure] = gas;
+    arrGas[current_measure%n_measure_aqi] = gas;
     int aqi = 2;
-    String stringaAQI = String("");
     float wifi_signal = WiFi.RSSI();
 
-    Serial.println();
-    Serial.print("Current_Measure --> ");
-    Serial.print(current_measure);
+    Serial.println("Current_Measure in loop --> " + String(current_measure));
+    aqi = calcoloAQI(MAX_GAS_VALUE, MIN_GAS_VALUE, arrGas, &current_measure);
 
-    if (current_measure < n_measure_aqi - 1) {
-      current_measure += 1;
-    } else {
-      current_measure = 0;
-      Serial.println();
-      Serial.print("AQI --> ");
-      aqi = calcoloAQI(MAX_GAS_VALUE, MIN_GAS_VALUE, arrGas);
-      stringaAQI = String(", \"aqi\":") + aqi;
-    }
 
-    String messaggio = String("{\"temperature\":") + temperature +
-                       String(", \"humidity\":") + humidity +
-                       String(", \"gas\":") + gas +
-                       String(", \"wifi_signal\":") + wifi_signal +
-                       String(", \"id\":\"") + client_id + String("\"") +
-                       String(", \"lat\":") + lat +
-                       String(", \"lon\": ") + lon +
-                       stringaAQI +
-                       String("}");
+    String messaggio = creaMessaggio(temperature, humidity, gas, aqi, wifi_signal);
 
-    Serial.println(protocol);
-    Serial.println(protocol == MQTT);
-    Serial.println(protocol == HTTP);
     if (protocol == MQTT) {
       client.publish(topic, messaggio.c_str());
-
     } else if (protocol == HTTP) {
-       initHTTP();
+      initHTTP();
       // Send HTTP POST request
       int httpResponseCode = http.POST(messaggio);
-      if (httpResponseCode > 0) {
-        Serial.print("HTTP Response code: ");
-        Serial.println(httpResponseCode);
-      }
-      else {
-        Serial.print("Error code: ");
-        Serial.println(httpResponseCode);
-      }
+      stampaErroriHTTP(httpResponseCode);
+
       // Free resources
       http.end();
     }
@@ -200,5 +212,6 @@ void loop() {
     Serial.println("WiFi Disconnected");
   }
   client.loop();
+  Serial.println("--------------------");
   delay(SAMPLE_FREQUENCY);
 }

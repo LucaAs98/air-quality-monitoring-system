@@ -173,7 +173,7 @@ async function getDevices() {
 }
 
 function createMessage(protocol, sample_frequency, max_gas, min_gas) {
-    return '{ \"protocol\": \"' + getProtocol(protocol.trim()) + '\",' +
+    return '{ \"protocol\": \"' + getProtocol(protocol) + '\",' +
         '\"sample_frequency\":' + sample_frequency + ',' +
         '\"max_gas\":' + max_gas + ',' +
         '\"min_gas\":' + min_gas + '}'
