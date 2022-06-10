@@ -51,7 +51,7 @@ clientMQTT.on('connect', () => {
 async function pointCreation(message) {
     console.log(message)
     //OpenWeather Data
-    const urlOpenWeather = 'https://api.openweathermap.org/data/2.5/weather?lat=' + message.lat + '&lon=' + message.lon + '&units=metric&appid=3e877f0f053735d3715ca7e534ca8efa'
+    const urlOpenWeather = 'https://api.openweathermap.org/data/2.5/weather?lat=' + message.lt + '&lon=' + message.ln + '&units=metric&appid=3e877f0f053735d3715ca7e534ca8efa'
 
     //Prendiamo la temperatura da openWeatherMap
     let tempOpenWeather = await axios.get(urlOpenWeather).then(response => {
@@ -61,13 +61,13 @@ async function pointCreation(message) {
     })
 
     let point = new Point('measurement')
-        .tag('id', message.id)
-        .tag('gps', message.lat + "," + message.lon)
-        .floatField('temperature', parseFloat(message.temperature).toFixed(2))
-        .floatField('humidity', parseFloat(message.humidity).toFixed(2))
-        .floatField('gas', parseFloat(message.gas).toFixed(2))
-       // .floatField('aqi', parseFloat(message.aqi).toFixed(2))
-        .floatField('wifi_signal', parseFloat(message.wifi_signal).toFixed(2))
+        .tag('id', message.i)
+        .tag('gps', message.lt + "," + message.ln)
+        .floatField('temperature', parseFloat(message.t).toFixed(2))
+        .floatField('humidity', parseFloat(message.h).toFixed(2))
+        .floatField('gas', parseFloat(message.g).toFixed(2))
+        .floatField('aqi', parseFloat(message.a).toFixed(2))
+        .floatField('wifi_signal', parseFloat(message.w).toFixed(2))
         .floatField('tempOpenWeather', tempOpenWeather)
 
 
