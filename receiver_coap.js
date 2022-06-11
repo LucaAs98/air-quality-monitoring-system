@@ -1,6 +1,6 @@
 //Inizializza COAP
 const coap = require('coap')
-const broker_address = '192.168.1.16'
+const broker_address = '192.168.1.15'
 
 //Loop dove andiamo a prendere tutto ciò che dobbiamo poi mandare a ThingSpeak
 const msIntervallo = 2000
@@ -23,9 +23,9 @@ async function coapRequest(){
     var options = {
         host: broker_address,
         port: 5683,
-        pathname: "/ciao",
-        method: 'get',
-        confirmable: 'true',
+        pathname: "/sensordata",
+        method: 'GET',
+        confirmable: true,
         options: {
             'Content-Format': 'application/json'
         }
@@ -45,7 +45,7 @@ async function coapRequest(){
             jsonData = JSON.parse(res.payload)
         });
         res.on('end', function () {
-            if (res.code == '2.05') {
+            if (res.code === '2.05') {
                 console.log('[coap] coap ready, request OK');
                 console.log(jsonData)
                 /*let point = new Point('measurement')
