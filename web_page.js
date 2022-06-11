@@ -51,6 +51,12 @@ let org = variables.ORG_INFLUX
 let bucket = variables.BUCKET_INFLUX
 let queryClient = clientInflux.getQueryApi(org)
 
+//CoAP
+const coap = require('coap')
+const CronJob = require('cron').CronJob;
+const CronTime = require('cron').CronTime;
+//mappa lista dei job attivi
+let mapJobs = new Map()
 
 /*** Richieste GET ***/
 /* Ad URL "/home" rendirizziamo "home.html". Questo a sua volta chiamerà lo script "home.js". */
@@ -141,7 +147,93 @@ app.post("/update_device", async (req, res) => {
             console.error(error)
         }
     })
+
+    let coapOp = parseInt(req.body.cop)
+    console.log("Valore coapop: " + coapOp)
+    switch (coapOp) {
+        case 0:
+            createCoAPJob(id, data.sample_frequency)
+            break;
+        case 1:
+            mapJobs.get(id).stop()
+            mapJobs.delete(id)
+            break;
+        default:
+            console.log('Stringa!')
+    }
+
+    res.end();
 });
+
+function createCoAPJob(id, sF) {
+
+    let sampleFrequency = parseInt(sF)
+    console.log("Creazione Job!")
+    let job = new CronJob('* * * * * *', async function () {
+        let g = new Date()
+        //Calcolo e settaggio del prossimo tempo di esecuzione
+        console.log("data 1 :" +g.toString())
+        g.setMilliseconds(g.getMilliseconds() + sampleFrequency)
+        console.log("data 2 :" +g.toString())
+        this.setTime(new CronTime(createCronTimeString(g)))
+        await coapRequest();
+    });
+    //Start del job
+    console.log("Avvio Job!")
+    job.start();
+    //Aggiunta del job ala mappa di quelli attivi
+    mapJobs.set(id, job)
+    console.log(mapJobs)
+}
+
+//Crea la stringa per il tempo per cron
+function createCronTimeString(d) {
+    let seconds = d.getSeconds()
+    let minutes = d.getMinutes()
+    let hours = d.getHours()
+
+    return seconds + ' ' + minutes + ' ' + hours + ' * * *'
+}
+
+async function coapRequest() {
+
+    console.log("coAP request!")
+    const broker_address = '192.168.1.15'
+
+    var options = {
+        host: broker_address,
+        port: 5683,
+        pathname: "/sensordata",
+        method: 'GET',
+        confirmable: true,
+        options: {
+            'Content-Format': 'application/json'
+        }
+    }
+
+    let req = await coap.request(options)
+    let jsonData
+
+    req.on('response', function (res) {
+        console.log('response code', res.code);
+        if (res.code !== '2.05') return console.log("CoAP Error!");
+
+        res.on('data', function () {
+            jsonData = JSON.parse(res.payload)
+        });
+        res.on('end', async function () {
+            if (res.code === '2.05') {
+                console.log('[coap] coap ready, request OK');
+                console.log(jsonData)
+                await pointCreation(jsonData)
+            } else {
+                console.log('[coap] coap res.code=' + res.code);
+            }
+        });
+    })
+    req.end();
+}
+
 
 //Rimuoviamo un device togliendolo da firestore in modo tale da non poterlo più visualizzare nella webpage
 app.post("/remove_device", async (req, res) => {

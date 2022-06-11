@@ -30,7 +30,7 @@ let writeClient = clientInflux.getWriteApi(org, bucket, 'ns')
 /** MQTT **/
 //Quando riceve un messaggio MQTT
 clientMQTT.on('message', async (topic, payload) => {
-    console.log('MQTT -> ', topic, payload.toString())
+   // console.log('MQTT -> ', topic, payload.toString())
     let message = JSON.parse(payload.toString())
     await pointCreation(message)
 })
@@ -49,7 +49,7 @@ clientMQTT.on('connect', () => {
 
 /** HTTP **/
 async function pointCreation(message) {
-    console.log(message)
+    //console.log(message)
     //OpenWeather Data
     const urlOpenWeather = 'https://api.openweathermap.org/data/2.5/weather?lat=' + message.lt + '&lon=' + message.ln + '&units=metric&appid=3e877f0f053735d3715ca7e534ca8efa'
 

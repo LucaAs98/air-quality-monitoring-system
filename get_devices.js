@@ -266,13 +266,34 @@ function setChangeParamBehaviour(dataFirestore) {
                     let modalBodyInputSample = modal.querySelector(`.modal-body input#sample_frequency_value_${dataFirestore.id}`);
                     let modalBodyInputProtocol = modal.querySelector(`.modal-body button#protocol_dropdown_${dataFirestore.id}`);
 
+
+                    let newProtocol = modalBodyInputProtocol.textContent.trim()
+
+                    let oldProtocol = arrayESP32.find(e => e.id === dataFirestore.id).protocol
+                    let coapOp
+
+                    if (oldProtocol !== newProtocol) {
+                        if (newProtocol === 'COAP') {
+                            coapOp = 0
+                        } else {
+                            if (oldProtocol === 'COAP' && newProtocol !== 'COAP') {
+                                coapOp = 1
+                            }
+                            else
+                                coapOp = 2
+                        }
+                    }else{
+                        coapOp = 2
+                    }
+
                     //Estraiamo i dati dai vari campi e creiamo l'oggetto con i nuovi valori
                     let data = {
                         id: dataFirestore.id,
                         max: modalBodyInputMax.value,
                         min: modalBodyInputMin.value,
                         sample_frequency: modalBodyInputSample.value,
-                        protocol: modalBodyInputProtocol.textContent.trim()
+                        protocol: newProtocol,
+                        cop: coapOp
                     }
 
                     //Mandiamo i nuovi dati sia a firebase che all'esp32
