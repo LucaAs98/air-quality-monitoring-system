@@ -149,14 +149,16 @@ app.post("/update_device", async (req, res) => {
     })
 
     let coapOp = parseInt(req.body.cop)
-    console.log("Valore coapop: " + coapOp)
+
     switch (coapOp) {
         case 0:
             createCoAPJob(id, data.sample_frequency)
             break;
         case 1:
-            mapJobs.get(id).stop()
-            mapJobs.delete(id)
+            if (mapJobs.has(id)) {
+                mapJobs.get(id).stop()
+                mapJobs.delete(id)
+            }
             break;
         default:
             console.log('Stringa!')
@@ -170,20 +172,21 @@ function createCoAPJob(id, sF) {
     let sampleFrequency = parseInt(sF)
     console.log("Creazione Job!")
     let job = new CronJob('* * * * * *', async function () {
+        console.log(id)
         let g = new Date()
         //Calcolo e settaggio del prossimo tempo di esecuzione
-        console.log("data 1 :" +g.toString())
+
         g.setMilliseconds(g.getMilliseconds() + sampleFrequency)
-        console.log("data 2 :" +g.toString())
+
         this.setTime(new CronTime(createCronTimeString(g)))
-        await coapRequest();
+        await coapRequest(id);
     });
     //Start del job
     console.log("Avvio Job!")
     job.start();
     //Aggiunta del job ala mappa di quelli attivi
     mapJobs.set(id, job)
-    console.log(mapJobs)
+
 }
 
 //Crea la stringa per il tempo per cron
@@ -195,10 +198,13 @@ function createCronTimeString(d) {
     return seconds + ' ' + minutes + ' ' + hours + ' * * *'
 }
 
-async function coapRequest() {
+async function coapRequest(id) {
 
-    console.log("coAP request!")
-    const broker_address = '192.168.1.15'
+    let broker_address
+    if(id=== "esp32_nash")
+        broker_address = '192.168.1.15'
+    else
+        broker_address = '192.168.1.16'
 
     var options = {
         host: broker_address,
@@ -215,7 +221,7 @@ async function coapRequest() {
     let jsonData
 
     req.on('response', function (res) {
-        console.log('response code', res.code);
+        //console.log('response code', res.code);
         if (res.code !== '2.05') return console.log("CoAP Error!");
 
         res.on('data', function () {
@@ -254,15 +260,25 @@ async function getDevices() {
 
     //Per ognuno di essi assegnamo tutti i parametri necessari.
     devicesCollection.forEach((result) => {
+
+        let resD = result.data()
+
         arrayESP32.push({
             id: result.id,
-            max: result.data().max_gas_value,
-            min: result.data().min_gas_value,
-            sample_frequency: result.data().sample_frequency,
-            protocol: result.data().protocol,
+            max: resD.max_gas_value,
+            min: resD.min_gas_value,
+            sample_frequency: resD.sample_frequency,
+            protocol: resD.protocol,
             lat: 44.490931818740,
             long: 11.35460682369
         })
+
+        if (resD.protocol === 'COAP') {
+            if (!mapJobs.has(result.id)) {
+                createCoAPJob(result.id, resD.sample_frequency)
+            }
+        }
+
     })
 
     //Restituiamo tutti i device
