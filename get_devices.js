@@ -163,7 +163,7 @@ function creaDivCarta(dataFirestore, dataInflux) {
             </div>
         </div>
        
-        <div class="modal fade" id=modal${dataFirestore.id} tabindex="-1" aria-labelledby=modal${dataFirestore.id}Label aria-hidden="true">
+        <div class="modal fade" id=modal${dataFirestore.id} tabindex="-1" aria-labelledby=modal${dataFirestore.id}Label aria-hidden="true" data-bs-keyboard="false" data-bs-backdrop="static">
           <div class="modal-dialog">
             <div class="modal-content">  
                 <form id="modal-form-${dataFirestore.id}">
@@ -172,7 +172,6 @@ function creaDivCarta(dataFirestore, dataInflux) {
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                   </div>
                   <div class="modal-body">
-             
                        <div class="mb-3">
                         <label for="max_gas_value_${dataFirestore.id}" class="form-label">MAX_GAS_VALUE</label>
                         <input type="text" class="form-control" id="max_gas_value_${dataFirestore.id}" value=${dataFirestore.max} name="max_gas" aria-describedby="max_gas_help">
