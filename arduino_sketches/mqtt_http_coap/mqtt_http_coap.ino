@@ -3,30 +3,32 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <coap-simple.h>
+#include "DHT.h"
 
 //Costanti
 #define MQTT 0
 #define HTTP 1
 #define COAP 2
-
+#define DHTPIN 21
+#define DHTTYPE DHT11   // DHT 11
 // WiFi
 const char *ssid = "Vodafone-C02090047"; // Enter your WiFi name
 const char *password = "ERxFJfcyc3rtpY3H";  // Enter WiFi password
 
 //HTTP
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.1.8:3000/sensordata";
+String serverName = "http://192.168.1.7:3000/sensordata";
 HTTPClient http;
 
 //Values
 const float lat = 44.495;
 const float lon = 11.386;
-String client_id = "esp32_nash";
+String client_id = "esp32_luca";
 const int n_measure_aqi = 5;
 int current_measure = 0;
 int protocol = MQTT;
-float MAX_GAS_VALUE = 3;
-float MIN_GAS_VALUE = 1;
+float MAX_GAS_VALUE = 150;
+float MIN_GAS_VALUE = 130;
 int SAMPLE_FREQUENCY = 2000;
 float arrGas[n_measure_aqi] = {};
 
@@ -45,10 +47,21 @@ Coap coap(udp);
 // CoAP callback
 void callback_sensordata(CoapPacket &packet, IPAddress ip, int port);
 
+//JSON
 StaticJsonDocument<200> doc;
 
+//WiFi
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+//Sensors
+//DHT11
+DHT dht(DHTPIN, DHTTYPE);
+//MQ-2
+int greenLed = 13;
+int smokeA0 = A5;
+//Threshold gas
+int sensorThres = 130;
 
 void initWiFi() {
   WiFi.mode(WIFI_STA);
@@ -87,23 +100,8 @@ void initHTTP() {
 }
 
 void initCoAP() {
-  Serial.println("Setup Callback Light");
   coap.server(callback_sensordata, "sensordata");
-  // start coap server/client
   coap.start();
-}
-
-void setup() {
-  // Set software serial baud to 115200;
-  Serial.begin(115200);
-  initWiFi();
-
-  initMQTT();
-
-  initHTTP();
-
-  initCoAP();
-
 }
 
 void callback(char *topic, byte *payload, unsigned int length) {
@@ -142,31 +140,26 @@ void callback(char *topic, byte *payload, unsigned int length) {
 int calcoloAQI(float max, float min, float * arrGas, int *counter) {
   int aqi = 2;
   float average = 0;
-  Serial.println("Counter in calcoloAQI --> " + String(*counter));
   if (*counter < n_measure_aqi - 1) {
     average = avg(arrGas, *counter + 1);
     *counter += 1;
   } else {
     average = avg(arrGas, sizeof(arrGas));
     if (*counter == ((n_measure_aqi * 2) - 1)) {
-      Serial.println("Ho fatto l'assegnamento");
       *counter = n_measure_aqi;
     } else {
       *counter += 1;
     }
-    Serial.println("Sto uscendo dall'else del calcoloAQI con counter --> " + String(*counter));
   }
   if (average >= MAX_GAS_VALUE) {
     aqi = 0;
   } else if (MIN_GAS_VALUE <= average < MAX_GAS_VALUE) {
     aqi = 1;
   }
-  Serial.println("AQI --> " + String(aqi));
   return aqi;
 }
 
 float avg(float * array, int len) {
-  Serial.println("Lunghezza array in avg --> " + String(len));
   long sum = 0L ;
   for (int i = 0 ; i < len ; i++)
     sum += array[i] ;
@@ -207,25 +200,56 @@ void callback_sensordata(CoapPacket &packet, IPAddress ip, int port) {
 }
 
 String calcoloValori() {
+  //DHT11
+  //Read humidity
+  float h = dht.readHumidity();
+  // Read temperature as Celsius
+  float t = dht.readTemperature();
 
-  float temperature = random(6, 300) / 100.0;
-  float humidity = random(6, 300) / 100.0;
-  float gas = random(6, 300) / 100.0;
-  arrGas[current_measure % n_measure_aqi] = gas;
-  int aqi = 2;
-  float wifi_signal = WiFi.RSSI();
+  //MQ-2
+  int g = analogRead(smokeA0);
 
-  //Serial.println("Current_Measure in loop --> " + String(current_measure));
-  aqi = calcoloAQI(MAX_GAS_VALUE, MIN_GAS_VALUE, arrGas, &current_measure);
+  // Check if any reads failed and exit early (to try again).
+  if (isnan(h) || isnan(t) || isnan(g)) {
+    Serial.println(F("Failed to read from sensors!"));
+    return "Errore";
+  } else {
+    Serial.println();
+    Serial.print("Humidity: " + String(h));
+    Serial.print(" - Temperature: " + String(t));
+    Serial.print(" - Gas value: " + String(g));
+    Serial.println();
 
-  String msg = creaMessaggio(temperature, humidity, gas, aqi, wifi_signal);
-  Serial.println(msg);
-  return msg;
+    arrGas[current_measure % n_measure_aqi] = g;
+    int aqi = 2;
+    float wifi_signal = WiFi.RSSI();
+
+    aqi = calcoloAQI(MAX_GAS_VALUE, MIN_GAS_VALUE, arrGas, &current_measure);
+
+    String msg = creaMessaggio(t, h, g, aqi, wifi_signal);
+    Serial.println(msg);
+    return msg;
+  }
+}
+
+void setup() {
+  // Set software serial baud to 115200;
+  Serial.begin(115200);
+  initWiFi();
+  initMQTT();
+  initHTTP();
+  initCoAP();
+  //DHT11
+  dht.begin();
+  //Pin MQ-2
+  pinMode(greenLed, OUTPUT);
+  pinMode(smokeA0, INPUT);
 }
 
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     String messaggio;
+
     if (protocol == MQTT || protocol == HTTP) {
       Serial.println("Creazione messaggio!");
       messaggio = calcoloValori();

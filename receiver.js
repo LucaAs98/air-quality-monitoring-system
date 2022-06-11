@@ -60,7 +60,7 @@ async function pointCreation(message) {
         console.error("Errore! Non sono riuscito a fare la richiesta a OpenWeatherMap")
     })
 
-    let point = new Point('measurement')
+    let point = new Point('real-measurements')
         .tag('id', message.i)
         .tag('gps', message.lt + "," + message.ln)
         .floatField('temperature', parseFloat(message.t).toFixed(2))
