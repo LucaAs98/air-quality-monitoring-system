@@ -174,11 +174,11 @@ function creaDivCarta(dataFirestore, dataInflux) {
                   <div class="modal-body">
                        <div class="mb-3">
                         <label for="max_gas_value_${dataFirestore.id}" class="form-label">MAX_GAS_VALUE</label>
-                        <input type="text" class="form-control" id="max_gas_value_${dataFirestore.id}" value=${dataFirestore.max} name="max_gas" aria-describedby="max_gas_help">
+                        <input type="text" class="form-control" id="max_gas_value_${dataFirestore.id}" value=${dataFirestore.max_gas_value} name="max_gas_value" aria-describedby="max_gas_help">
                       </div>
                       <div class="mb-3">
                         <label for="min_gas_value_${dataFirestore.id}" class="form-label">MIN_GAS_VALUE</label>
-                        <input type="text" class="form-control" id="min_gas_value_${dataFirestore.id}" value=${dataFirestore.min} name="min_gas" aria-describedby="min_gas_help">
+                        <input type="text" class="form-control" id="min_gas_value_${dataFirestore.id}" value=${dataFirestore.min_gas_value} name="min_gas_value" aria-describedby="min_gas_help">
                       </div>
                       <div class="mb-3">
                         <label for="sample_frequency_value_${dataFirestore.id}" class="form-label">SAMPLE FREQUENCY</label>
@@ -226,11 +226,11 @@ function setChangeParamBehaviour(dataFirestore) {
             $(`#modal-form-${dataFirestore.id}`).validate({
                 errorClass: "my-error-class",
                 rules: {
-                    max_gas: {
+                    max_gas_value: {
                         required: true,
                         number: true
                     },
-                    min_gas: {
+                    min_gas_value: {
                         required: true,
                         number: true
                     },
@@ -240,11 +240,11 @@ function setChangeParamBehaviour(dataFirestore) {
                     },
                 },
                 messages: {
-                    max_gas: {
+                    max_gas_value: {
                         required: "Please enter the max gas value",
                         number: "Enter a number please"
                     },
-                    min_gas: {
+                    min_gas_value: {
                         required: "Please enter the min gas value",
                         number: "Enter a number please"
                     },
@@ -278,19 +278,18 @@ function setChangeParamBehaviour(dataFirestore) {
                         } else {
                             if (oldProtocol === 'COAP' && newProtocol !== 'COAP') {
                                 coapOp = 1
-                            }
-                            else
+                            } else
                                 coapOp = 2
                         }
-                    }else{
+                    } else {
                         coapOp = 2
                     }
 
                     //Estraiamo i dati dai vari campi e creiamo l'oggetto con i nuovi valori
                     let data = {
                         id: dataFirestore.id,
-                        max: modalBodyInputMax.value,
-                        min: modalBodyInputMin.value,
+                        max_gas_value: modalBodyInputMax.value,
+                        min_gas_value: modalBodyInputMin.value,
                         sample_frequency: modalBodyInputSample.value,
                         protocol: newProtocol,
                         cop: coapOp

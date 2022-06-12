@@ -58,6 +58,9 @@ const CronTime = require('cron').CronTime;
 //mappa lista dei job attivi
 let mapJobs = new Map()
 
+
+let arrayESP32 = [];
+
 /*** Richieste GET ***/
 /* Ad URL "/home" rendirizziamo "home.html". Questo a sua volta chiamerà lo script "home.js". */
 app.get("/home", (req, res) => {
@@ -115,8 +118,8 @@ app.post("/home", (req, res) => {
 app.post("/add_device", async (req, res) => {
     const id = req.body.id
     const data = {
-        max_gas_value: req.body.max,
-        min_gas_value: req.body.min,
+        max_gas_value: req.body.max_gas_value,
+        min_gas_value: req.body.min_gas_value,
         protocol: req.body.protocol,
         sample_frequency: req.body.sample_frequency,
     };
@@ -129,24 +132,21 @@ app.post("/add_device", async (req, res) => {
 app.post("/update_device", async (req, res) => {
     const id = req.body.id
     const data = {
-        max_gas_value: req.body.max,
-        min_gas_value: req.body.min,
+        max_gas_value: req.body.max_gas_value,
+        min_gas_value: req.body.min_gas_value,
         protocol: req.body.protocol,
         sample_frequency: req.body.sample_frequency,
     };
 
     //Aggiorniamo il device a quel determinato id
     const request = await db.collection('device').doc(id).update(data)
+    data.id = req.body.id;
+    arrayESP32.filter(obj => obj.id === id)[0] = data;
+    console.log(arrayESP32)
 
     //Dopo aver aggiornato i dati su firestore andiamo a comunicarli anche all'esp32
-    clientMQTT.publish(topics[0] + id, createMessage(data.protocol, data.sample_frequency, data.max_gas_value, data.min_gas_value), {
-        qos: 0,
-        retain: false
-    }, (error) => {
-        if (error) {
-            console.error(error)
-        }
-    })
+    sendNewParameters(data);
+
 
     let coapOp = parseInt(req.body.cop)
 
@@ -163,7 +163,6 @@ app.post("/update_device", async (req, res) => {
         default:
             console.log('Stringa!')
     }
-
     res.end();
 });
 
@@ -201,7 +200,7 @@ function createCronTimeString(d) {
 async function coapRequest(id) {
 
     let broker_address
-    if(id=== "esp32_nash")
+    if (id === "esp32_nash")
         broker_address = '192.168.1.15'
     else
         broker_address = '192.168.1.16'
@@ -253,20 +252,28 @@ app.post('/sensordata', async function (req, res) {
     res.end();
 });
 
+//Riceviamo la richiesta di inizializzazione da parte dell'esp
+app.post('/initialize', async function (req, res) {
+    let message = req.body
+    let parameters = arrayESP32.filter(obj => obj.id === message.id)[0]
+    console.log(parameters)
+    sendNewParameters(parameters)
+    res.end();
+});
+
+
 //Metodo che prende tutti i device da firebase
 async function getDevices() {
     const devicesCollection = await db.collection('device').get();
-    let arrayESP32 = [];
+    arrayESP32 = []
 
     //Per ognuno di essi assegnamo tutti i parametri necessari.
     devicesCollection.forEach((result) => {
-
         let resD = result.data()
-
         arrayESP32.push({
             id: result.id,
-            max: resD.max_gas_value,
-            min: resD.min_gas_value,
+            max_gas_value: resD.max_gas_value,
+            min_gas_value: resD.min_gas_value,
             sample_frequency: resD.sample_frequency,
             protocol: resD.protocol,
             lat: 44.490931818740,
@@ -278,7 +285,6 @@ async function getDevices() {
                 createCoAPJob(result.id, resD.sample_frequency)
             }
         }
-
     })
 
     //Restituiamo tutti i device
@@ -286,11 +292,11 @@ async function getDevices() {
 }
 
 //Funzione che crea il messagio da inviare all'esp32
-function createMessage(protocol, sample_frequency, max_gas, min_gas) {
+function createMessage(protocol, sample_frequency, max_gas_value, min_gas_value) {
     return '{ \"protocol\": \"' + getProtocol(protocol) + '\",' +
         '\"sample_frequency\":' + sample_frequency + ',' +
-        '\"max_gas\":' + max_gas + ',' +
-        '\"min_gas\":' + min_gas + '}'
+        '\"max_gas_value\":' + max_gas_value + ',' +
+        '\"min_gas_value\":' + min_gas_value + '}'
 }
 
 /* Funzione che dato il protocollo in stringa restituisce il suo numero corrispondente. Abbiamo fatto questo per prenderlo
@@ -317,6 +323,17 @@ function influxDataFormat(data) {
             value: obj._value,
         }))
     return newData
+}
+
+function sendNewParameters(data) {
+    clientMQTT.publish(topics[0] + data.id, createMessage(data.protocol, data.sample_frequency, data.max_gas_value, data.min_gas_value), {
+        qos: 0,
+        retain: false
+    }, (error) => {
+        if (error) {
+            console.error(error)
+        }
+    })
 }
 
 // All'avvio apriamo la home con il browser di default.

@@ -41,11 +41,11 @@ function setAddDeviceBehaviour() {
                 id: {
                     required: true,
                 },
-                max_gas: {
+                max_gas_value: {
                     required: true,
                     number: true
                 },
-                min_gas: {
+                min_gas_value: {
                     required: true,
                     number: true
                 },
@@ -58,11 +58,11 @@ function setAddDeviceBehaviour() {
                 id: {
                     required: "Please enter the id value",
                 },
-                max_gas: {
+                max_gas_value: {
                     required: "Please enter the max gas value",
                     number: "Enter a number please"
                 },
-                min_gas: {
+                min_gas_value: {
                     required: "Please enter the min gas value",
                     number: "Enter a number please"
                 },
@@ -84,8 +84,8 @@ function setAddDeviceBehaviour() {
                 } else {
                     let data = {
                         id: modalBodyInputTitle.value,
-                        max: modalBodyInputMax.value,
-                        min: modalBodyInputMin.value,
+                        max_gas_value: modalBodyInputMax.value,
+                        min_gas_value: modalBodyInputMin.value,
                         sample_frequency: modalBodyInputSample.value,
                         protocol: modalBodyInputProtocol.textContent
                     }

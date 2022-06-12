@@ -30,9 +30,13 @@ let writeClient = clientInflux.getWriteApi(org, bucket, 'ns')
 /** MQTT **/
 //Quando riceve un messaggio MQTT
 clientMQTT.on('message', async (topic, payload) => {
-   // console.log('MQTT -> ', topic, payload.toString())
-    let message = JSON.parse(payload.toString())
-    await pointCreation(message)
+    if (payload.toString() !== "Errore") {
+        console.log('MQTT -> ', topic, payload.toString())
+        let message = JSON.parse(payload.toString())
+        await pointCreation(message)
+    } else {
+        console.log("Non sono riuscito a leggere i dati dai sensori!")
+    }
 })
 
 //Quando si connette si sottoscrive ai due topic a cui siamo interessati
@@ -49,7 +53,6 @@ clientMQTT.on('connect', () => {
 
 /** HTTP **/
 async function pointCreation(message) {
-    //console.log(message)
     //OpenWeather Data
     const urlOpenWeather = 'https://api.openweathermap.org/data/2.5/weather?lat=' + message.lt + '&lon=' + message.ln + '&units=metric&appid=3e877f0f053735d3715ca7e534ca8efa'
 
@@ -60,7 +63,12 @@ async function pointCreation(message) {
         console.error("Errore! Non sono riuscito a fare la richiesta a OpenWeatherMap")
     })
 
-    let point = new Point('measurements')
+    let measurement = 'real-measurements'
+    if (message.i !== "esp32_luca") {
+        measurement = 'measurements'
+    }
+
+    let point = new Point(measurement)
         .tag('id', message.i)
         .tag('gps', message.lt + "," + message.ln)
         .floatField('temperature', parseFloat(message.t).toFixed(2))
@@ -73,4 +81,5 @@ async function pointCreation(message) {
 
     writeClient.writePoint(point)
 }
+
 module.exports = pointCreation
