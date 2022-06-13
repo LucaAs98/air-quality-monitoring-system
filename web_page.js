@@ -152,7 +152,8 @@ app.post("/update_device", async (req, res) => {
 
     switch (coapOp) {
         case 0:
-            createCoAPJob(id, data.sample_frequency)
+            if (!mapJobs.has(id))
+                createCoAPJob(id, data.sample_frequency)
             break;
         case 1:
             if (mapJobs.has(id)) {
@@ -170,13 +171,13 @@ function createCoAPJob(id, sF) {
 
     let sampleFrequency = parseInt(sF)
     console.log("Creazione Job!")
-    let job = new CronJob('* * * * * *', async function () {
+    let d = new Date()
+    d.setMilliseconds(d.getMilliseconds() + sampleFrequency)
+    let job = new CronJob(createCronTimeString(d), async function () {
         console.log(id)
         let g = new Date()
         //Calcolo e settaggio del prossimo tempo di esecuzione
-
         g.setMilliseconds(g.getMilliseconds() + sampleFrequency)
-
         this.setTime(new CronTime(createCronTimeString(g)))
         await coapRequest(id);
     });
@@ -185,7 +186,6 @@ function createCoAPJob(id, sF) {
     job.start();
     //Aggiunta del job ala mappa di quelli attivi
     mapJobs.set(id, job)
-
 }
 
 //Crea la stringa per il tempo per cron
@@ -255,10 +255,15 @@ app.post('/sensordata', async function (req, res) {
 //Riceviamo la richiesta di inizializzazione da parte dell'esp
 app.post('/initialize', async function (req, res) {
     let message = req.body
+    console.log(message.ip)
     let parameters = arrayESP32.filter(obj => obj.id === message.id)[0]
-    console.log(parameters)
-    sendNewParameters(parameters)
-    res.end();
+
+    if(parameters !== undefined){
+        sendNewParameters(parameters)
+        res.end()
+    }else{
+        res.sendStatus(501)
+    }
 });
 
 

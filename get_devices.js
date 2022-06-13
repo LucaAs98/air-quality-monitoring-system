@@ -87,7 +87,7 @@ function aggiungiCarta(dataFirestore, dataInflux) {
 
 //Funzione chiamata al click del bottone "Vedi su Grafana"
 function visualizeGrafanaGraphs(id) {
-    window.open("https://cyberdude.it/wp-content/uploads/2021/01/science-of-earworms-explain-why-never-gonna-give-you-up-is-stuck-in-our-heads-30-years-later.png", '_blank').focus();
+    window.open("http://localhost:4000/d/BWTZxxr7z/iotproject2022?orgId=1&refresh=5s&from=now-5m&to=now&theme=dark&&var-id="+id, '_blank').focus();
     //Visualizza grafico per esp + dataFirestore.id, potremmo farlo visualizzare sotto, oppure restituire solo il link
 }
 
