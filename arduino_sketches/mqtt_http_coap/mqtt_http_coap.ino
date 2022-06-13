@@ -11,6 +11,7 @@
 #define COAP 2
 #define DHTPIN 21
 #define DHTTYPE DHT11   // DHT 11
+
 // WiFi
 const char *ssid = "Vodafone-C02090047"; // Enter your WiFi name
 const char *password = "ERxFJfcyc3rtpY3H";  // Enter WiFi password
@@ -19,6 +20,8 @@ const char *password = "ERxFJfcyc3rtpY3H";  // Enter WiFi password
 //Your Domain name with URL path or IP address with path
 String serverName = "http://192.168.1.7:3000/sensordata";
 HTTPClient http;
+//HTTP to initialize esp
+String serverInit = "http://192.168.1.7:3000/initialize";
 
 //Values
 const float lat = 44.495;
@@ -27,10 +30,12 @@ String client_id = "esp32_luca";
 const int n_measure_aqi = 5;
 int current_measure = 0;
 int protocol = MQTT;
-float MAX_GAS_VALUE = 150;
-float MIN_GAS_VALUE = 130;
-int SAMPLE_FREQUENCY = 2000;
+float MAX_GAS_VALUE = 0;
+float MIN_GAS_VALUE = 0;
+int SAMPLE_FREQUENCY = 5000;
 float arrGas[n_measure_aqi] = {};
+bool inizializzato = false;
+bool connectionOk = false;
 
 
 //MQTT
@@ -63,6 +68,7 @@ int smokeA0 = A5;
 //Threshold gas
 int sensorThres = 130;
 
+//Inizializzazione connessione wifi
 void initWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -74,6 +80,7 @@ void initWiFi() {
   Serial.println(WiFi.localIP());
 }
 
+//Inizializzazione connessione MQTT
 void initMQTT() {
   //connecting to a mqtt broker
   client.setServer(mqtt_broker, mqtt_port);
@@ -93,17 +100,20 @@ void initMQTT() {
   client.subscribe(topicReceive);
 }
 
-void initHTTP() {
+//Inizializzazione connessione http
+void initHTTP(String server) {
   // Your Domain name with URL path or IP address with path
-  http.begin(serverName);
+  http.begin(server);
   http.addHeader("Content-Type", "application/json");
 }
 
+//Inizializzazione connessione coap
 void initCoAP() {
   coap.server(callback_sensordata, "sensordata");
   coap.start();
 }
 
+//Funzione per ricevere messaggi dal server
 void callback(char *topic, byte *payload, unsigned int length) {
   String message = "";
   Serial.println();
@@ -112,8 +122,6 @@ void callback(char *topic, byte *payload, unsigned int length) {
     message.concat(String((char) payload[i]));
   }
 
-  //char json[] = message;
-
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, message);
 
@@ -121,22 +129,24 @@ void callback(char *topic, byte *payload, unsigned int length) {
   if (error) {
     Serial.print(F("deserializeJson() failed: "));
     Serial.println(error.f_str());
-    return;
+    Serial.println("I can't set the new parameters, JSON error!");
+  } else {
+    // Se il messaggio arrivato è correttamente formattato
+    protocol = doc["protocol"];
+    MAX_GAS_VALUE = doc["max_gas"];
+    MIN_GAS_VALUE = doc["min_gas"];
+    SAMPLE_FREQUENCY = doc["sample_frequency"];
+    inizializzato = true;
+    Serial.println("New values:");
+    Serial.println("Protocol:" + String(protocol));
+    Serial.println("MAX_GAS_VALUE:" + String(MAX_GAS_VALUE));
+    Serial.println("MIN_GAS_VALUE:" + String(MIN_GAS_VALUE));
+    Serial.println("SAMPLE_FREQUENCY:" + String(SAMPLE_FREQUENCY));
+    Serial.println();
   }
-
-  // Fetch values.
-  protocol = doc["protocol"];
-  MAX_GAS_VALUE = doc["max_gas"];
-  MIN_GAS_VALUE = doc["min_gas"];
-  SAMPLE_FREQUENCY = doc["sample_frequency"];
-  Serial.println("New values:");
-  Serial.println("Protocol:" + String(protocol));
-  Serial.println("MAX_GAS_VALUE:" + String(MAX_GAS_VALUE));
-  Serial.println("MIN_GAS_VALUE:" + String(MIN_GAS_VALUE));
-  Serial.println("SAMPLE_FREQUENCY:" + String(SAMPLE_FREQUENCY));
-  Serial.println();
 }
 
+//Funzione per calcolare la qualità dell'aria
 int calcoloAQI(float max, float min, float * arrGas, int *counter) {
   int aqi = 2;
   float average = 0;
@@ -159,6 +169,7 @@ int calcoloAQI(float max, float min, float * arrGas, int *counter) {
   return aqi;
 }
 
+//Media degli elementi di un array
 float avg(float * array, int len) {
   long sum = 0L ;
   for (int i = 0 ; i < len ; i++)
@@ -166,8 +177,8 @@ float avg(float * array, int len) {
   return  ((float) sum) / len ;
 }
 
+//Funzione per creare la stringa da mandare al server
 String creaMessaggio(float temperature, float humidity, float gas, int aqi, float wifi_signal) {
-
   return String("{\"t\":") + temperature +
          String(", \"h\":") + humidity +
          String(", \"g\":") + gas +
@@ -179,13 +190,17 @@ String creaMessaggio(float temperature, float humidity, float gas, int aqi, floa
          String("}");
 }
 
-void stampaErroriHTTP(int httpResponseCode) {
+//Stampa gli errori o i successi della connessione http, return true se è andato tutto bene
+bool stampaErroriHTTP(int httpResponseCode) {
+  bool ok = false;
   if (httpResponseCode > 0) {
     Serial.print("HTTP Response code: ");
+    ok = true;
   } else {
     Serial.print("Error code: ");
   }
   Serial.println(httpResponseCode);
+  return ok;
 }
 
 // CoAP server endpoint URL
@@ -199,6 +214,7 @@ void callback_sensordata(CoapPacket &packet, IPAddress ip, int port) {
                     packet.token, packet.tokenlen);
 }
 
+//Prendiamo i valori dai sensori e calcoliamo la qualità dell'aria
 String calcoloValori() {
   //DHT11
   //Read humidity
@@ -232,45 +248,73 @@ String calcoloValori() {
   }
 }
 
+/* Mandiamo il messaggio al server per inizializzare i parametri dell'esp, tramite l'id il server ci riconoscerà e ci invierà
+i dati corretti per il nostro esp. */
+void initParameters() {
+  bool ok = false;
+  String messaggioInit = String("{\"id\": \"" + client_id + "\"}");
+  initHTTP(serverInit);
+  Serial.println("Ho inviato il messaggio di inizializzazione");
+  // Send HTTP POST request
+  int httpResponseCode = http.POST(messaggioInit);
+  ok = stampaErroriHTTP(httpResponseCode);
+  inizializzato = ok;
+  // Free resources
+  http.end();
+}
+
+//SETUP
 void setup() {
   // Set software serial baud to 115200;
   Serial.begin(115200);
+
   initWiFi();
   initMQTT();
-  initHTTP();
+  initHTTP(serverName);
   initCoAP();
+
   //DHT11
   dht.begin();
+
   //Pin MQ-2
   pinMode(greenLed, OUTPUT);
   pinMode(smokeA0, INPUT);
 }
 
+//LOOP
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
-    String messaggio;
+    if (!inizializzato) {
+      initParameters();
+      delay(3000);
+    } else {
+      String messaggio;
 
-    if (protocol == MQTT || protocol == HTTP) {
-      Serial.println("Creazione messaggio!");
-      messaggio = calcoloValori();
-    }
+      if (protocol == MQTT || protocol == HTTP) {
+        messaggio = calcoloValori();
+      }
 
-    if (protocol == MQTT) {
-      client.publish(topic, messaggio.c_str());
-    } else if (protocol == HTTP) {
-      initHTTP();
-      // Send HTTP POST request
-      int httpResponseCode = http.POST(messaggio);
-      stampaErroriHTTP(httpResponseCode);
+      if (protocol == MQTT) {
+        client.publish(topic, messaggio.c_str());
+      } else if (protocol == HTTP) {
+       connectionOk = false;
 
-      // Free resources
-      http.end();
+        while(!connectionOk){
+        initHTTP(serverName);
+        // Send HTTP POST request
+                int httpResponseCode = http.POST(messaggio);
+                connectionOk = stampaErroriHTTP(httpResponseCode);
+
+                // Free resources
+                http.end();
+        }
+      }
     }
   } else {
     Serial.println("WiFi Disconnected");
   }
   client.loop();
   coap.loop();
-  //Serial.println("--------------------");
+  //Serial.println("--------------------");*/
   delay(SAMPLE_FREQUENCY);
 }
