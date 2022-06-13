@@ -11,6 +11,7 @@
 #define COAP 2
 #define DHTPIN 21
 #define DHTTYPE DHT11   // DHT 11
+#define MAXDELAYINIT 19000
 
 // WiFi
 const char *ssid = "Vodafone-C02090047"; // Enter your WiFi name
@@ -18,24 +19,25 @@ const char *password = "ERxFJfcyc3rtpY3H";  // Enter WiFi password
 
 //HTTP
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.1.7:3000/sensordata";
+String serverName = "http://192.168.1.8:3000/sensordata";
 HTTPClient http;
 //HTTP to initialize esp
-String serverInit = "http://192.168.1.7:3000/initialize";
+String serverInit = "http://192.168.1.8:3000/initialize";
 
 //Values
 const float lat = 44.495;
 const float lon = 11.386;
-String client_id = "esp32_luca";
+String client_id = "esp32_nash";
 const int n_measure_aqi = 5;
 int current_measure = 0;
 int protocol = MQTT;
 float MAX_GAS_VALUE = 0;
 float MIN_GAS_VALUE = 0;
-int SAMPLE_FREQUENCY = 5000;
+int SAMPLE_FREQUENCY = 1000;
 float arrGas[n_measure_aqi] = {};
 bool inizializzato = false;
 bool connectionOk = false;
+int countDelayInit = 0;
 
 
 //MQTT
@@ -133,16 +135,16 @@ void callback(char *topic, byte *payload, unsigned int length) {
   } else {
     // Se il messaggio arrivato è correttamente formattato
     protocol = doc["protocol"];
-    MAX_GAS_VALUE = doc["max_gas"];
-    MIN_GAS_VALUE = doc["min_gas"];
+    MAX_GAS_VALUE = doc["max_gas_value"];
+    MIN_GAS_VALUE = doc["min_gas_value"];
     SAMPLE_FREQUENCY = doc["sample_frequency"];
-    inizializzato = true;
     Serial.println("New values:");
     Serial.println("Protocol:" + String(protocol));
     Serial.println("MAX_GAS_VALUE:" + String(MAX_GAS_VALUE));
     Serial.println("MIN_GAS_VALUE:" + String(MIN_GAS_VALUE));
     Serial.println("SAMPLE_FREQUENCY:" + String(SAMPLE_FREQUENCY));
     Serial.println();
+    inizializzato = true;
   }
 }
 
@@ -249,7 +251,7 @@ String calcoloValori() {
 }
 
 /* Mandiamo il messaggio al server per inizializzare i parametri dell'esp, tramite l'id il server ci riconoscerà e ci invierà
-i dati corretti per il nostro esp. */
+  i dati corretti per il nostro esp. */
 void initParameters() {
   bool ok = false;
   String messaggioInit = String("{\"id\": \"" + client_id + "\"}");
@@ -258,9 +260,24 @@ void initParameters() {
   // Send HTTP POST request
   int httpResponseCode = http.POST(messaggioInit);
   ok = stampaErroriHTTP(httpResponseCode);
-  inizializzato = ok;
   // Free resources
   http.end();
+}
+
+void checkInitRequest() {
+  //Se il contatore è a zero, effettuiamo una richiesta per i parametri
+  if (countDelayInit == 0) {
+    initParameters();
+    countDelayInit = countDelayInit + SAMPLE_FREQUENCY;
+  }//Se non è zero, aspettiamo tot secondi, se raggiungiamo la soglia dei venti ne facciamo un'altra
+  else {
+    if (countDelayInit == MAXDELAYINIT) {
+      countDelayInit = 0;
+    }
+    else {
+      countDelayInit = countDelayInit + SAMPLE_FREQUENCY;
+    }
+  }
 }
 
 //SETUP
@@ -285,8 +302,7 @@ void setup() {
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     if (!inizializzato) {
-      initParameters();
-      delay(3000);
+      checkInitRequest();
     } else {
       String messaggio;
 
@@ -297,16 +313,16 @@ void loop() {
       if (protocol == MQTT) {
         client.publish(topic, messaggio.c_str());
       } else if (protocol == HTTP) {
-       connectionOk = false;
+        connectionOk = false;
 
-        while(!connectionOk){
-        initHTTP(serverName);
-        // Send HTTP POST request
-                int httpResponseCode = http.POST(messaggio);
-                connectionOk = stampaErroriHTTP(httpResponseCode);
+        while (!connectionOk) {
+          initHTTP(serverName);
+          // Send HTTP POST request
+          int httpResponseCode = http.POST(messaggio);
+          connectionOk = stampaErroriHTTP(httpResponseCode);
 
-                // Free resources
-                http.end();
+          // Free resources
+          http.end();
         }
       }
     }
