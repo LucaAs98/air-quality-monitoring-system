@@ -137,7 +137,11 @@ void callback(char *topic, byte *payload, unsigned int length) {
     protocol = doc["protocol"];
     MAX_GAS_VALUE = doc["max_gas_value"];
     MIN_GAS_VALUE = doc["min_gas_value"];
-    SAMPLE_FREQUENCY = doc["sample_frequency"];
+    if (protocol != COAP)
+      SAMPLE_FREQUENCY = doc["sample_frequency"];
+    else
+      SAMPLE_FREQUENCY = 1000;
+    
     Serial.println("New values:");
     Serial.println("Protocol:" + String(protocol));
     Serial.println("MAX_GAS_VALUE:" + String(MAX_GAS_VALUE));
