@@ -26,8 +26,8 @@ HTTPClient http;
 String serverInit = "http://192.168.1.7:3000/initialize";
 
 //Values
-const float lat = 44.495;
-const float lon = 11.386;
+const float lat = 44.4945441;
+const float lon = 11.3440067;
 String client_id = "esp32_caio";
 const int n_measure_aqi = 5;
 int current_measure = 0;
@@ -176,7 +176,7 @@ int calcoloAQI(float max, float min, float * arrGas, int *counter) {
   }
   if (average >= MAX_GAS_VALUE) {
     aqi = 0;
-  } else if (MIN_GAS_VALUE <= average < MAX_GAS_VALUE) {
+  } else if (MIN_GAS_VALUE <= average && average < MAX_GAS_VALUE) {
     aqi = 1;
   }
   return aqi;
@@ -204,11 +204,9 @@ String creaMessaggio(float temperature, float humidity, float gas, int aqi, floa
 }
 
 //Stampa gli errori o i successi della connessione http, return true se è andato tutto bene
-bool stampaErroriHTTP(int httpResponseCode) {
-  bool ok = false;
+void stampaErroriHTTP(int httpResponseCode) {
   if (httpResponseCode > 0) {
     Serial.print("HTTP Response code: ");
-    ok = true;
   } else {
     Serial.print("Error code: ");
   }
@@ -216,8 +214,6 @@ bool stampaErroriHTTP(int httpResponseCode) {
   if (httpResponseCode == 501) {
     Serial.println("Nessun dispositivo registrato con questo id!");
   }
-
-  return ok;
 }
 
 // CoAP server endpoint URL
@@ -325,17 +321,13 @@ void loop() {
       if (protocol == MQTT) {
         client.publish(topic, messaggio.c_str());
       } else if (protocol == HTTP) {
-        connectionOk = false;
 
-        //è giusto fare il ciclo while qui??? Potrebbe fare più richieste per sbaglio??
-        while (!connectionOk) {
-          initHTTP(serverName);
-          // Send HTTP POST request
-          int httpResponseCode = http.POST(messaggio);
-          connectionOk = stampaErroriHTTP(httpResponseCode);
-          // Free resources
-          http.end();
-        }
+        initHTTP(serverName);
+        // Send HTTP POST request
+        int httpResponseCode = http.POST(messaggio);
+        stampaErroriHTTP(httpResponseCode);
+        // Free resources
+        http.end();
       }
     }
   } else {
@@ -343,6 +335,6 @@ void loop() {
   }
   client.loop();
   coap.loop();
-  //Serial.println("--------------------");*/
+  //Serial.println("--------------------");
   delay(SAMPLE_FREQUENCY);
 }

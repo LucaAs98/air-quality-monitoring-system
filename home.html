@@ -74,7 +74,7 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="id_new_device" class="form-label">ID</label>
+                        <label for="id_new_device" class="form-label"><strong>ID</strong></label>
                         <input type="text" class="form-control" id="id_new_device" name="id"
                                placeholder="Metti qui l'ID del tuo device" aria-describedby="id_help" required>
                         <div id="validationServerUsernameFeedback" class="invalid-feedback">
@@ -83,32 +83,38 @@
                         <p class="my-error-class" id="errore_id_presente">This device is already registred, use another
                             id please</p>
                     </div>
-                    <div class="mb-3">
-                        <label for="max_gas_value_new_device" class="form-label">MAX_GAS_VALUE</label>
-                        <input type="text" class="form-control" id="max_gas_value_new_device" name="max_gas_value"
-                               placeholder="Metti qui la soglia massima del gas" aria-describedby="max_gas_help"
-                               required>
+
+                    <label><strong>MIN</strong> and <strong>MAX</strong> GAS VALUE:</label>
+                    <div class="wrapper">
+                        <div class="container">
+                            <div class="slider-track" id="slider-track-home"></div>
+                            <input class="min_gas_value" type="range" min="0" max="200" value="0" step="10"
+                                   id="slider-1-home">
+                            <input class="max_gas_value" type="range" min="0" max="200" value="200" step="10"
+                                   id="slider-2-home">
+                        </div>
+                        <div class="row label-min-max">
+                            <div class="col-6">
+                                <label class="form-label">MIN:</label> <span id="range1-home">0</span>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">MAX:</label> <span id="range2-home"> 100</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
-                        <label for="min_gas_value_new_device" class="form-label">MIN_GAS_VALUE</label>
-                        <input type="text" class="form-control" id="min_gas_value_new_device" name="min_gas_value"
-                               placeholder="Metti qui la soglia minima del gas" aria-describedby="min_gas_help"
-                               required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="sample_frequency_value_new_device" class="form-label">SAMPLE FREQUENCY</label>
+                        <label for="sample_frequency_value_new_device" class="form-label"><strong>SAMPLE
+                            FREQUENCY</strong></label>
                         <input type="text" class="form-control" id="sample_frequency_value_new_device"
                                name="sample_frequency"
                                placeholder="Metti qui la sample frequency" aria-describedby="sample_frequency_help"
                                required>
                     </div>
                     <div class="mb-3">
-                        <label for="protocol_dropdown" class="form-label">PROTOCOL</label>
+                        <label for="protocol_dropdown" class="form-label"><strong>PROTOCOL</strong></label>
                         <div class="dropdown">
                             <button class="btn btn-secondary dropdown-toggle" type="button" id="protocol_dropdown"
-                                    data-bs-toggle="dropdown" aria-expanded="false">
-                                MQTT
-                            </button>
+                                    data-bs-toggle="dropdown" aria-expanded="false">MQTT</button>
                             <ul class="dropdown-menu" aria-labelledby="protocol_dropdown">
                                 <li class="dropdown-item">MQTT</li>
                                 <li class="dropdown-item">COAP</li>

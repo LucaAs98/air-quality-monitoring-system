@@ -63,10 +63,7 @@ async function pointCreation(message) {
         console.error("Errore! Non sono riuscito a fare la richiesta a OpenWeatherMap")
     })
 
-    let measurement = 'real-measurements'
-    if (message.i !== "esp32_luca") {
-        measurement = 'measurements'
-    }
+    let measurement = 'measurements'
 
     let point = new Point(measurement)
         .tag('id', message.i)

@@ -126,6 +126,7 @@ app.post("/add_device", async (req, res) => {
 
     //Creaimo un doc chiamato con l'id e salviamo all'interno di esso tutti i dati relativi a quel determinato device
     const request = await db.collection('device').doc(id).set(data)
+    data.id = id;
     sendNewParameters(data)
 });
 
@@ -168,7 +169,6 @@ app.post("/update_device", async (req, res) => {
 });
 
 function createCoAPJob(id, sF) {
-
     let sampleFrequency = parseInt(sF)
     console.log("Creazione Job per -> " + id)
     let d = new Date()
@@ -234,7 +234,7 @@ async function coapRequest(id) {
             })
             req.end();
         } else {
-            console.log("Non ho a disposizione l'ip del dispositivo!")
+            console.log("Non ho a disposizione l'ip del dispositivo " + id + "!")
         }
     } else {
         console.log("Il dispositivo non è presente nel database!")
@@ -280,6 +280,7 @@ app.post('/initialize', async function (req, res) {
         //Aggiorniamo il device a quel determinato id aggiungendo l'ip
         await db.collection('device').doc(parameters.id).update({ip: parameters.ip})
         arrayESP32.filter(obj => obj.id === parameters.id)[0] = parameters.ip;
+        parameters.id = message.id
         sendNewParameters(parameters)
         res.end()
     } else {

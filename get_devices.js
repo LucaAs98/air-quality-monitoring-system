@@ -1,3 +1,11 @@
+let id = "home"
+setSliderBehaviour(id, "min_gas_value")
+setSliderBehaviour(id, "max_gas_value")
+$('input[type=range]').on('input', function () {
+    let sliderClass = $(this).attr("class").split(" ")[0]
+    setSliderBehaviour(id, sliderClass)
+});
+
 //Prendiamo tutti i device presenti su firestore, creiamo le loro carte e li visualizziamo nella webpage.
 getDevices()
 
@@ -87,7 +95,7 @@ function aggiungiCarta(dataFirestore, dataInflux) {
 
 //Funzione chiamata al click del bottone "Vedi su Grafana"
 function visualizeGrafanaGraphs(id) {
-    window.open("http://localhost:4000/d/BWTZxxr7z/iotproject2022?orgId=1&refresh=5s&from=now-5m&to=now&theme=dark&&var-id="+id, '_blank').focus();
+    window.open("http://localhost:4000/d/BWTZxxr7z/iotproject2022?orgId=1&refresh=5s&from=now-5m&to=now&theme=dark&&var-id=" + id, '_blank').focus();
     //Visualizza grafico per esp + dataFirestore.id, potremmo farlo visualizzare sotto, oppure restituire solo il link
 }
 
@@ -133,6 +141,12 @@ function nuovoLayerMappa() {
     })
 }
 
+function fillColor(sliderMin, sliderMax, sliderMaxValue, sliderTrack) {
+    let percent1 = (sliderMin.value / sliderMaxValue) * 100;
+    let percent2 = (sliderMax.value / sliderMaxValue) * 100;
+    sliderTrack.style.background = `linear-gradient(to right, #dadae5 ${percent1}% , #3264fe ${percent1}% , #3264fe ${percent2}%, #dadae5 ${percent2}%)`;
+}
+
 //Ritorna una nuova card per ogni esp32 registrato.
 function creaDivCarta(dataFirestore, dataInflux) {
     return `<div class="col">
@@ -167,36 +181,44 @@ function creaDivCarta(dataFirestore, dataInflux) {
           <div class="modal-dialog">
             <div class="modal-content">  
                 <form id="modal-form-${dataFirestore.id}">
-                  <div class="modal-header">
+                <div class="modal-header">
                     <h5 class="modal-title" id=modal${dataFirestore.id}Label>Change ${dataFirestore.id}'s parameters</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                       
+                <label><strong>MIN</strong> and <strong>MAX</strong> GAS VALUE:</label>
+                <div class="wrapper">
+                    <div class="container">
+                        <div class="slider-track" id=slider-track-${dataFirestore.id}></div>
+                        <input class="min_gas_value" type="range" min="0" max="200" value=${dataFirestore.min_gas_value} step="10" id=slider-1-${dataFirestore.id}>
+                        <input class="max_gas_value" type="range" min="0" max="200" value=${dataFirestore.max_gas_value} step="10" id=slider-2-${dataFirestore.id}>
+                    </div>
+                    <div class="row label-min-max">
+                        <div class="col-6">
+                            <label class="form-label">MIN:</label> <span id=range1-${dataFirestore.id}>0</span>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">MAX:</label> <span id=range2-${dataFirestore.id}> 100</span>
+                        </div>
+                    </div>
+                </div>
+                       
+                  <div class="mb-3">
+                    <label for="sample_frequency_value_${dataFirestore.id}" class="form-label">SAMPLE FREQUENCY</label>
+                    <input type="text" class="form-control" id="sample_frequency_value_${dataFirestore.id}" value=${dataFirestore.sample_frequency} name="sample_frequency" aria-describedby="sample_frequency_help">
                   </div>
-                  <div class="modal-body">
-                       <div class="mb-3">
-                        <label for="max_gas_value_${dataFirestore.id}" class="form-label">MAX_GAS_VALUE</label>
-                        <input type="text" class="form-control" id="max_gas_value_${dataFirestore.id}" value=${dataFirestore.max_gas_value} name="max_gas_value" aria-describedby="max_gas_help">
-                      </div>
-                      <div class="mb-3">
-                        <label for="min_gas_value_${dataFirestore.id}" class="form-label">MIN_GAS_VALUE</label>
-                        <input type="text" class="form-control" id="min_gas_value_${dataFirestore.id}" value=${dataFirestore.min_gas_value} name="min_gas_value" aria-describedby="min_gas_help">
-                      </div>
-                      <div class="mb-3">
-                        <label for="sample_frequency_value_${dataFirestore.id}" class="form-label">SAMPLE FREQUENCY</label>
-                        <input type="text" class="form-control" id="sample_frequency_value_${dataFirestore.id}" value=${dataFirestore.sample_frequency} name="sample_frequency" aria-describedby="sample_frequency_help">
-                      </div>
-                       <label for="protocol_dropdown_${dataFirestore.id}" class="form-label">PROTOCOL</label>
-                            <div class="dropdown">
-                                <button class="btn btn-secondary dropdown-toggle" type="button" id="protocol_dropdown_${dataFirestore.id}"
-                                        data-bs-toggle="dropdown" aria-expanded="false">
-                                    ${dataFirestore.protocol}
-                                </button>
-                                <ul class="dropdown-menu" aria-labelledby="protocol_dropdown_${dataFirestore.id}">
-                                    <li class="dropdown-item">MQTT</li>
-                                    <li class="dropdown-item">COAP</li>
-                                    <li class="dropdown-item">HTTP</li>
-                                </ul>
-                            </div>
-                  </div>
+                   <label for="protocol_dropdown_${dataFirestore.id}" class="form-label">PROTOCOL</label>
+                        <div class="dropdown">
+                            <button class="btn btn-secondary dropdown-toggle" type="button" id="protocol_dropdown_${dataFirestore.id}"
+                                    data-bs-toggle="dropdown" aria-expanded="false">${dataFirestore.protocol}</button>
+                            <ul class="dropdown-menu" aria-labelledby="protocol_dropdown_${dataFirestore.id}">
+                                <li class="dropdown-item">MQTT</li>
+                                <li class="dropdown-item">COAP</li>
+                                <li class="dropdown-item">HTTP</li>
+                            </ul>
+                        </div>
+              </div>
                   <div class="modal-footer">
                     <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
                     <button type="button" class="btn btn-success" id="change_parameters_${dataFirestore.id}">Cambia parametri</button>
@@ -221,33 +243,19 @@ function setChangeParamBehaviour(dataFirestore) {
                 $(`#protocol_dropdown_${dataFirestore.id}`).text(protocol)
             })
 
+            setSliderBehaviour(dataFirestore.id, "min_gas_value")
+            setSliderBehaviour(dataFirestore.id, "max_gas_value")
 
             /* Controlliamo che i campi siano correttamente completati. */
             $(`#modal-form-${dataFirestore.id}`).validate({
                 errorClass: "my-error-class",
                 rules: {
-                    max_gas_value: {
-                        required: true,
-                        number: true
-                    },
-                    min_gas_value: {
-                        required: true,
-                        number: true
-                    },
                     sample_frequency: {
                         required: true,
                         number: true
                     },
                 },
                 messages: {
-                    max_gas_value: {
-                        required: "Please enter the max gas value",
-                        number: "Enter a number please"
-                    },
-                    min_gas_value: {
-                        required: "Please enter the min gas value",
-                        number: "Enter a number please"
-                    },
                     sample_frequency: {
                         required: "Please enter the sample frequency value",
                         number: "Enter a number please"
@@ -261,8 +269,6 @@ function setChangeParamBehaviour(dataFirestore) {
                     return false;
                 } else {
                     // Aggiorniamo il contenuto del modal, prendiamo i campi
-                    let modalBodyInputMax = modal.querySelector(`.modal-body input#max_gas_value_${dataFirestore.id}`);
-                    let modalBodyInputMin = modal.querySelector(`.modal-body input#min_gas_value_${dataFirestore.id}`);
                     let modalBodyInputSample = modal.querySelector(`.modal-body input#sample_frequency_value_${dataFirestore.id}`);
                     let modalBodyInputProtocol = modal.querySelector(`.modal-body button#protocol_dropdown_${dataFirestore.id}`);
 
@@ -288,13 +294,12 @@ function setChangeParamBehaviour(dataFirestore) {
                     //Estraiamo i dati dai vari campi e creiamo l'oggetto con i nuovi valori
                     let data = {
                         id: dataFirestore.id,
-                        max_gas_value: modalBodyInputMax.value,
-                        min_gas_value: modalBodyInputMin.value,
+                        max_gas_value: $("#slider-2-" + dataFirestore.id).val(),
+                        min_gas_value: $("#slider-1-" + dataFirestore.id).val(),
                         sample_frequency: modalBodyInputSample.value,
                         protocol: newProtocol,
                         cop: coapOp
                     }
-
                     //Mandiamo i nuovi dati sia a firebase che all'esp32
                     $.post("/update_device", data);
                     //Piccola sleep per avere il tempo di aggiornare i dati e poter ricaricare infine la pagina
@@ -302,6 +307,37 @@ function setChangeParamBehaviour(dataFirestore) {
                     window.location.reload();
                 }
             });
+
+            $('input[type=range]').on('input', function () {
+                let sliderClass = $(this).attr("class").split(" ")[0]
+                setSliderBehaviour(dataFirestore.id, sliderClass)
+            });
         }
     );
+}
+
+function setSliderBehaviour(id, sliderClass) {
+    let sliderMin = document.getElementById(`slider-1-${id}`);
+    let sliderMax = document.getElementById(`slider-2-${id}`);
+    let displayValMin = document.getElementById(`range1-${id}`);
+    let displayValMax = document.getElementById(`range2-${id}`);
+    let minGap = 10;
+    let sliderTrack = document.getElementById(`slider-track-${id}`);
+    let sliderMaxValue = document.getElementById(`slider-1-${id}`).max;
+
+
+    if (sliderClass === "max_gas_value") {
+        if (parseInt(sliderMax.value) - parseInt(sliderMin.value) <= minGap) {
+            sliderMax.value = parseInt(sliderMin.value) + minGap;
+        }
+        displayValMax.textContent = sliderMax.value;
+        fillColor(sliderMin, sliderMax, sliderMaxValue, sliderTrack);
+    } else {
+        if (parseInt(sliderMax.value) - parseInt(sliderMin.value) <= minGap) {
+            sliderMin.value = parseInt(sliderMax.value) - minGap;
+        }
+        displayValMin.textContent = sliderMin.value;
+        fillColor(sliderMin, sliderMax, sliderMaxValue, sliderTrack);
+    }
+
 }

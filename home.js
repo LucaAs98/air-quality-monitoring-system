@@ -22,6 +22,7 @@ $(`.dropdown-item`).on('click', function () {
     $(`#protocol_dropdown`).text(protocol)
 })
 
+/** MODAL **/
 //Setta il comportamento del modal che si apre quando aggiungiamo un device nella webpage.
 function setAddDeviceBehaviour() {
     //Comportamento del modal che si apre quando aggiungiamo un device nella webpage.
@@ -29,8 +30,6 @@ function setAddDeviceBehaviour() {
     modal.addEventListener('show.bs.modal', function (event) {
         // Prendiamo gli elementi dall'html
         let modalBodyInputTitle = modal.querySelector(`.modal-body input#id_new_device`);
-        let modalBodyInputMax = modal.querySelector(`.modal-body input#max_gas_value_new_device`);
-        let modalBodyInputMin = modal.querySelector(`.modal-body input#min_gas_value_new_device`);
         let modalBodyInputSample = modal.querySelector(`.modal-body input#sample_frequency_value_new_device`);
         let modalBodyInputProtocol = modal.querySelector(`.modal-body button#protocol_dropdown`);
 
@@ -41,14 +40,6 @@ function setAddDeviceBehaviour() {
                 id: {
                     required: true,
                 },
-                max_gas_value: {
-                    required: true,
-                    number: true
-                },
-                min_gas_value: {
-                    required: true,
-                    number: true
-                },
                 sample_frequency: {
                     required: true,
                     number: true
@@ -57,14 +48,6 @@ function setAddDeviceBehaviour() {
             messages: {
                 id: {
                     required: "Please enter the id value",
-                },
-                max_gas_value: {
-                    required: "Please enter the max gas value",
-                    number: "Enter a number please"
-                },
-                min_gas_value: {
-                    required: "Please enter the min gas value",
-                    number: "Enter a number please"
                 },
                 sample_frequency: {
                     required: "Please enter the sample frequency value",
@@ -84,8 +67,8 @@ function setAddDeviceBehaviour() {
                 } else {
                     let data = {
                         id: modalBodyInputTitle.value,
-                        max_gas_value: modalBodyInputMax.value,
-                        min_gas_value: modalBodyInputMin.value,
+                        max_gas_value: $(`#slider-2-home`).val(),   //behaviour dello slider impostato in get_device
+                        min_gas_value: $(`#slider-1-home`).val(),
                         sample_frequency: modalBodyInputSample.value,
                         protocol: modalBodyInputProtocol.textContent
                     }
