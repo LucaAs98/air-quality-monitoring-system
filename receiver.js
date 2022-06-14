@@ -31,8 +31,8 @@ let writeClient = clientInflux.getWriteApi(org, bucket, 'ns')
 //Quando riceve un messaggio MQTT
 clientMQTT.on('message', async (topic, payload) => {
     if (payload.toString() !== "Errore") {
-        console.log('MQTT -> ', topic, payload.toString())
         let message = JSON.parse(payload.toString())
+        console.log('MQTT ' + message.i + ' -> ' + JSON.stringify(message))
         await pointCreation(message)
     } else {
         console.log("Non sono riuscito a leggere i dati dai sensori!")

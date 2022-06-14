@@ -120,12 +120,13 @@ app.post("/add_device", async (req, res) => {
     const data = {
         max_gas_value: req.body.max_gas_value,
         min_gas_value: req.body.min_gas_value,
-        protocol: req.body.protocol,
+        protocol: req.body.protocol.trim(),
         sample_frequency: req.body.sample_frequency,
     };
 
     //Creaimo un doc chiamato con l'id e salviamo all'interno di esso tutti i dati relativi a quel determinato device
     const request = await db.collection('device').doc(id).set(data)
+    sendNewParameters(data)
 });
 
 //Inviamo l'update del device
@@ -134,7 +135,7 @@ app.post("/update_device", async (req, res) => {
     const data = {
         max_gas_value: req.body.max_gas_value,
         min_gas_value: req.body.min_gas_value,
-        protocol: req.body.protocol,
+        protocol: req.body.protocol.trim(),
         sample_frequency: req.body.sample_frequency,
     };
 
@@ -142,7 +143,6 @@ app.post("/update_device", async (req, res) => {
     const request = await db.collection('device').doc(id).update(data)
     data.id = req.body.id;
     arrayESP32.filter(obj => obj.id === id)[0] = data;
-    console.log(arrayESP32)
 
     //Dopo aver aggiornato i dati su firestore andiamo a comunicarli anche all'esp32
     sendNewParameters(data);
@@ -170,11 +170,10 @@ app.post("/update_device", async (req, res) => {
 function createCoAPJob(id, sF) {
 
     let sampleFrequency = parseInt(sF)
-    console.log("Creazione Job!")
+    console.log("Creazione Job per -> " + id)
     let d = new Date()
     d.setMilliseconds(d.getMilliseconds() + sampleFrequency)
     let job = new CronJob(createCronTimeString(d), async function () {
-        console.log(id)
         let g = new Date()
         //Calcolo e settaggio del prossimo tempo di esecuzione
         g.setMilliseconds(g.getMilliseconds() + sampleFrequency)
@@ -182,7 +181,7 @@ function createCoAPJob(id, sF) {
         await coapRequest(id);
     });
     //Start del job
-    console.log("Avvio Job!")
+    console.log("Avvio Job di -> " + id)
     job.start();
     //Aggiunta del job ala mappa di quelli attivi
     mapJobs.set(id, job)
@@ -198,56 +197,74 @@ function createCronTimeString(d) {
 }
 
 async function coapRequest(id) {
+    let obj = arrayESP32.filter(obj => obj.id === id)[0]
 
-    let broker_address
-    if (id === "esp32_nash")
-        broker_address = '192.168.1.15'
-    else
-        broker_address = '192.168.1.16'
+    if (obj !== undefined) {
+        let broker_address = obj.ip
 
-    var options = {
-        host: broker_address,
-        port: 5683,
-        pathname: "/sensordata",
-        method: 'GET',
-        confirmable: true,
-        options: {
-            'Content-Format': 'application/json'
-        }
-    }
-
-    let req = await coap.request(options)
-    let jsonData
-
-    req.on('response', function (res) {
-        //console.log('response code', res.code);
-        if (res.code !== '2.05') return console.log("CoAP Error!");
-
-        res.on('data', function () {
-            jsonData = JSON.parse(res.payload)
-        });
-        res.on('end', async function () {
-            if (res.code === '2.05') {
-                console.log('[coap] coap ready, request OK');
-                console.log(jsonData)
-                await pointCreation(jsonData)
-            } else {
-                console.log('[coap] coap res.code=' + res.code);
+        if (broker_address !== undefined) {
+            var options = {
+                host: broker_address,
+                port: 5683,
+                pathname: "/sensordata",
+                method: 'GET',
+                confirmable: true,
+                options: {
+                    'Content-Format': 'application/json'
+                }
             }
-        });
-    })
-    req.end();
+
+            let req = await coap.request(options)
+            let jsonData
+
+            req.on('response', function (res) {
+                if (res.code !== '2.05') return console.log("CoAP Error!");
+
+                res.on('data', function () {
+                    jsonData = JSON.parse(res.payload)
+                });
+                res.on('end', async function () {
+                    if (res.code === '2.05') {
+                        console.log("COAP " + id + " -> " + JSON.stringify(jsonData))
+                        await pointCreation(jsonData)
+                    } else {
+                        console.log('[coap] coap res.code=' + res.code);
+                    }
+                });
+            })
+            req.end();
+        } else {
+            console.log("Non ho a disposizione l'ip del dispositivo!")
+        }
+    } else {
+        console.log("Il dispositivo non è presente nel database!")
+    }
 }
 
 
 //Rimuoviamo un device togliendolo da firestore in modo tale da non poterlo più visualizzare nella webpage
 app.post("/remove_device", async (req, res) => {
     const request = await db.collection('device').doc(req.body.id).delete()
+    if (mapJobs.has(req.body.id)) {
+        mapJobs.get(req.body.id).stop()
+        mapJobs.delete(req.body.id)
+    }
+    //Segnaliamo all'esp che è stato rimosso dal db
+    let parameters = {
+        id: req.body.id,
+        max_gas_value: 0,
+        min_gas_value: 0,
+        sample_frequency: 1000,
+        protocol: "UNDEFINED"
+    }
+    sendNewParameters(parameters)
+    res.end()
 })
 
 //Riceviamo i dati tramite HTTP dall'esp, creiamo quindi il punto e lo spediamo ad InfluxDB
 app.post('/sensordata', async function (req, res) {
     let message = req.body
+    console.log("HTTP " + req.body.i + " -> " + JSON.stringify(req.body))
     await pointCreation(message)
     res.end();
 });
@@ -255,13 +272,18 @@ app.post('/sensordata', async function (req, res) {
 //Riceviamo la richiesta di inizializzazione da parte dell'esp
 app.post('/initialize', async function (req, res) {
     let message = req.body
-    console.log(message.ip)
+    console.log("Richiesta inizializzazione da parte di -> " + message.ip)
     let parameters = arrayESP32.filter(obj => obj.id === message.id)[0]
 
-    if(parameters !== undefined){
+    if (parameters !== undefined) {
+        parameters.ip = message.ip;
+        //Aggiorniamo il device a quel determinato id aggiungendo l'ip
+        await db.collection('device').doc(parameters.id).update({ip: parameters.ip})
+        arrayESP32.filter(obj => obj.id === parameters.id)[0] = parameters.ip;
         sendNewParameters(parameters)
         res.end()
-    }else{
+    } else {
+        console.log("Il dispositivo " + message.id + " non è stato ancora registrato!")
         res.sendStatus(501)
     }
 });
@@ -275,15 +297,20 @@ async function getDevices() {
     //Per ognuno di essi assegnamo tutti i parametri necessari.
     devicesCollection.forEach((result) => {
         let resD = result.data()
-        arrayESP32.push({
+        let data = {
             id: result.id,
             max_gas_value: resD.max_gas_value,
             min_gas_value: resD.min_gas_value,
             sample_frequency: resD.sample_frequency,
-            protocol: resD.protocol,
+            protocol: resD.protocol.trim(),
             lat: 44.490931818740,
             long: 11.35460682369
-        })
+        }
+        if (resD.ip !== undefined) {
+            data.ip = resD.ip
+        }
+
+        arrayESP32.push(data)
 
         if (resD.protocol === 'COAP') {
             if (!mapJobs.has(result.id)) {
@@ -307,14 +334,15 @@ function createMessage(protocol, sample_frequency, max_gas_value, min_gas_value)
 /* Funzione che dato il protocollo in stringa restituisce il suo numero corrispondente. Abbiamo fatto questo per prenderlo
 * più semplicemente dall'esp32 occupando anche meno memoria. */
 function getProtocol(protocol) {
-    console.log(protocol)
-    switch (protocol) {
+    switch (protocol.trim()) {
         case "MQTT":
             return 0;
         case "HTTP":
             return 1;
         case "COAP":
             return 2;
+        default:
+            return 3;
     }
 }
 
@@ -337,6 +365,8 @@ function sendNewParameters(data) {
     }, (error) => {
         if (error) {
             console.error(error)
+        } else {
+            console.log("Dati inviati all'esp -> " + data.id)
         }
     })
 }

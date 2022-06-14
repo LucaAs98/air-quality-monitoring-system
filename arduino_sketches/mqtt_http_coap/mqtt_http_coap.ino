@@ -9,9 +9,10 @@
 #define MQTT 0
 #define HTTP 1
 #define COAP 2
+#define UNDEFINED 3
 #define DHTPIN 21
 #define DHTTYPE DHT11   // DHT 11
-#define MAXDELAYINIT 19000
+#define MAXDELAYINIT 19000  //Delay prima di fare una nuova richiesta di inizializzazione +1000 generale
 
 // WiFi
 const char *ssid = "Vodafone-C02090047"; // Enter your WiFi name
@@ -19,15 +20,15 @@ const char *password = "ERxFJfcyc3rtpY3H";  // Enter WiFi password
 
 //HTTP
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.1.8:3000/sensordata";
+String serverName = "http://192.168.1.7:3000/sensordata";
 HTTPClient http;
 //HTTP to initialize esp
-String serverInit = "http://192.168.1.8:3000/initialize";
+String serverInit = "http://192.168.1.7:3000/initialize";
 
 //Values
 const float lat = 44.495;
 const float lon = 11.386;
-String client_id = "esp32_nash";
+String client_id = "esp32_caio";
 const int n_measure_aqi = 5;
 int current_measure = 0;
 int protocol = MQTT;
@@ -38,6 +39,7 @@ float arrGas[n_measure_aqi] = {};
 bool inizializzato = false;
 bool connectionOk = false;
 int countDelayInit = 0;
+String initString = "Sto facendo la richiesta di inizializzazione...";
 
 
 //MQTT
@@ -141,14 +143,19 @@ void callback(char *topic, byte *payload, unsigned int length) {
       SAMPLE_FREQUENCY = doc["sample_frequency"];
     else
       SAMPLE_FREQUENCY = 1000;
-    
-    Serial.println("New values:");
+
     Serial.println("Protocol:" + String(protocol));
     Serial.println("MAX_GAS_VALUE:" + String(MAX_GAS_VALUE));
     Serial.println("MIN_GAS_VALUE:" + String(MIN_GAS_VALUE));
     Serial.println("SAMPLE_FREQUENCY:" + String(SAMPLE_FREQUENCY));
     Serial.println();
-    inizializzato = true;
+    if (protocol != UNDEFINED) {
+      inizializzato = true;
+    } else {
+      inizializzato = false;
+      countDelayInit = 0;
+      initString = "Sto facendo la richiesta di inizializzazione...";
+    }
   }
 }
 
@@ -206,13 +213,15 @@ bool stampaErroriHTTP(int httpResponseCode) {
     Serial.print("Error code: ");
   }
   Serial.println(httpResponseCode);
+  if (httpResponseCode == 501) {
+    Serial.println("Nessun dispositivo registrato con questo id!");
+  }
+
   return ok;
 }
 
 // CoAP server endpoint URL
 void callback_sensordata(CoapPacket &packet, IPAddress ip, int port) {
-  Serial.println("Sensor Data Request");
-
   const char *messaggio = calcoloValori().c_str();
 
   coap.sendResponse(ip, port, packet.messageid, messaggio,
@@ -236,12 +245,6 @@ String calcoloValori() {
     Serial.println(F("Failed to read from sensors!"));
     return "Errore";
   } else {
-    Serial.println();
-    Serial.print("Humidity: " + String(h));
-    Serial.print(" - Temperature: " + String(t));
-    Serial.print(" - Gas value: " + String(g));
-    Serial.println();
-
     arrGas[current_measure % n_measure_aqi] = g;
     int aqi = 2;
     float wifi_signal = WiFi.RSSI();
@@ -249,7 +252,7 @@ String calcoloValori() {
     aqi = calcoloAQI(MAX_GAS_VALUE, MIN_GAS_VALUE, arrGas, &current_measure);
 
     String msg = creaMessaggio(t, h, g, aqi, wifi_signal);
-    Serial.println(msg);
+    Serial.println(client_id + " - Protocollo: " + protocol + " --> " + msg);
     return msg;
   }
 }
@@ -258,12 +261,12 @@ String calcoloValori() {
   i dati corretti per il nostro esp. */
 void initParameters() {
   bool ok = false;
-  String messaggioInit = String("{\"id\": \"" + client_id + "\"}");
+  String messaggioInit = String("{\"id\": \"" + client_id + "\", \"ip\": \"" + WiFi.localIP().toString() + "\"}");
   initHTTP(serverInit);
-  Serial.println("Ho inviato il messaggio di inizializzazione");
+  //Serial.println("Ho inviato il messaggio di inizializzazione");
   // Send HTTP POST request
   int httpResponseCode = http.POST(messaggioInit);
-  ok = stampaErroriHTTP(httpResponseCode);
+  //ok = stampaErroriHTTP(httpResponseCode);
   // Free resources
   http.end();
 }
@@ -276,6 +279,9 @@ void checkInitRequest() {
   }//Se non è zero, aspettiamo tot secondi, se raggiungiamo la soglia dei venti ne facciamo un'altra
   else {
     if (countDelayInit == MAXDELAYINIT) {
+      Serial.println();
+      Serial.println("Nessuna risposta. Faccio una nuova richiesta!");
+      initString = "Sto facendo la richiesta di inizializzazione...";
       countDelayInit = 0;
     }
     else {
@@ -306,6 +312,8 @@ void setup() {
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     if (!inizializzato) {
+      Serial.print(initString);
+      initString = ".";
       checkInitRequest();
     } else {
       String messaggio;
@@ -319,12 +327,12 @@ void loop() {
       } else if (protocol == HTTP) {
         connectionOk = false;
 
+        //è giusto fare il ciclo while qui??? Potrebbe fare più richieste per sbaglio??
         while (!connectionOk) {
           initHTTP(serverName);
           // Send HTTP POST request
           int httpResponseCode = http.POST(messaggio);
           connectionOk = stampaErroriHTTP(httpResponseCode);
-
           // Free resources
           http.end();
         }
