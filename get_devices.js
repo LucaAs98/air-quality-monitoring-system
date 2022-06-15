@@ -206,7 +206,9 @@ function creaDivCarta(dataFirestore, dataInflux) {
                        
                   <div class="mb-3">
                     <label for="sample_frequency_value_${dataFirestore.id}" class="form-label">SAMPLE FREQUENCY</label>
-                    <input type="text" class="form-control" id="sample_frequency_value_${dataFirestore.id}" value=${dataFirestore.sample_frequency} name="sample_frequency" aria-describedby="sample_frequency_help">
+                    <input type="number" class="form-control" id="sample_frequency_value_${dataFirestore.id}" 
+                    value=${dataFirestore.sample_frequency} name="sample_frequency" aria-describedby="sample_frequency_help"
+                    value="2000" step="2000" min="2000">
                   </div>
                    <label for="protocol_dropdown_${dataFirestore.id}" class="form-label">PROTOCOL</label>
                         <div class="dropdown">

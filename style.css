@@ -109,3 +109,10 @@ input[type="range"]:active::-webkit-slider-thumb {
     color: #3264fe;
     font-weight: bold;
 }
+
+#loading {
+    margin-left: 42%;
+    font-size: 24px;
+    alignment: center;
+    width: 8%;
+}

@@ -57,9 +57,10 @@
     </blockquote>
 </figure>
 <figure class="text-center" id="loading">
-    <blockquote class="blockquote">
-        <p>Loading....</p>
-    </blockquote>
+    <div class="d-flex align-items-center">
+        <strong>Loading</strong>
+        <div class="spinner-border ms-auto" role="status" aria-hidden="true"></div>
+    </div>
 </figure>
 
 
@@ -74,7 +75,7 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="id_new_device" class="form-label"><strong>ID</strong></label>
+                        <label for="id_new_device" class="form-label"><strong>ID:</strong></label>
                         <input type="text" class="form-control" id="id_new_device" name="id"
                                placeholder="Metti qui l'ID del tuo device" aria-describedby="id_help" required>
                         <div id="validationServerUsernameFeedback" class="invalid-feedback">
@@ -104,14 +105,14 @@
                     </div>
                     <div class="mb-3">
                         <label for="sample_frequency_value_new_device" class="form-label"><strong>SAMPLE
-                            FREQUENCY</strong></label>
-                        <input type="text" class="form-control" id="sample_frequency_value_new_device"
-                               name="sample_frequency"
+                            FREQUENCY</strong> (ms):</label>
+                        <input type="number" class="form-control" id="sample_frequency_value_new_device"
+                               name="sample_frequency" value="2000" step="2000" min="2000"
                                placeholder="Metti qui la sample frequency" aria-describedby="sample_frequency_help"
                                required>
                     </div>
                     <div class="mb-3">
-                        <label for="protocol_dropdown" class="form-label"><strong>PROTOCOL</strong></label>
+                        <label for="protocol_dropdown" class="form-label"><strong>PROTOCOL:</strong></label>
                         <div class="dropdown">
                             <button class="btn btn-secondary dropdown-toggle" type="button" id="protocol_dropdown"
                                     data-bs-toggle="dropdown" aria-expanded="false">MQTT</button>
