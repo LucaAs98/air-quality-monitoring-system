@@ -83,7 +83,8 @@ app.get("/devices", async (req, res) => {
 app.get("/get_influx_data", async (req, res) => {
     let fluxQuery =
         `from(bucket: "${variables.BUCKET_INFLUX}")
-                |> range(start: -10d)
+                |> range(start: -1d)
+                |> filter(fn: (r) => r["_field"] != "_message")
                 |> group(columns: ["id", "_field"])
                 |> mean()`
 
