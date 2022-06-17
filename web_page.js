@@ -5,6 +5,8 @@ const pointCreation = require("./receiver")
 const express = require("express");
 const open = require('open');
 const app = express();
+const sendAlerts = require("./telegram/index")
+const axios = require("axios");
 
 app.set('views', __dirname + '/');
 app.engine('html', require('ejs').renderFile);
@@ -21,11 +23,6 @@ app.listen(3000, () => {
 
 /** Inizializzazione FIREBASE **/
 let admin = require("firebase-admin");
-let serviceAccount = require("./progettoiot2022-firebase-adminsdk-hoxdu-085c6305e8.json");
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: "https://progettoiot2022-default-rtdb.europe-west1.firebasedatabase.app"
-});
 let db = admin.firestore();
 
 /** Inizializzazione MQTT **/
@@ -242,7 +239,6 @@ async function coapRequest(id) {
     }
 }
 
-
 //Rimuoviamo un device togliendolo da firestore in modo tale da non poterlo più visualizzare nella webpage
 app.post("/remove_device", async (req, res) => {
     const request = await db.collection('device').doc(req.body.id).delete()
@@ -273,13 +269,29 @@ app.post('/sensordata', async function (req, res) {
 //Riceviamo la richiesta di inizializzazione da parte dell'esp
 app.post('/initialize', async function (req, res) {
     let message = req.body
+    //OpenWeather Data
+    const urlOpenWeather = 'https://api.openweathermap.org/data/2.5/weather?lat=' + message.lt + '&lon=' + message.ln + '&units=metric&appid=3e877f0f053735d3715ca7e534ca8efa'
+
+    //Prendiamo la temperatura da openWeatherMap
+    let espPosition = await axios.get(urlOpenWeather).then(response => {
+        console.log(response.data)
+        return response.data.name + " - " + response.data.sys.country
+    }).catch(error => {
+        console.error("Errore! Non sono riuscito a prendere la posizione dell'esp!")
+    })
+
     console.log("Richiesta inizializzazione da parte di -> " + message.ip)
     let parameters = arrayESP32.filter(obj => obj.id === message.id)[0]
 
     if (parameters !== undefined) {
         parameters.ip = message.ip;
         //Aggiorniamo il device a quel determinato id aggiungendo l'ip
-        await db.collection('device').doc(parameters.id).update({ip: parameters.ip})
+        await db.collection('device').doc(parameters.id).update({
+            ip: message.ip,
+            lt: message.lt,
+            ln: message.ln,
+            city: espPosition
+        })
         arrayESP32.filter(obj => obj.id === parameters.id)[0] = parameters.ip;
         parameters.id = message.id
         sendNewParameters(parameters)
@@ -289,7 +301,6 @@ app.post('/initialize', async function (req, res) {
         res.sendStatus(501)
     }
 });
-
 
 //Metodo che prende tutti i device da firebase
 async function getDevices() {
@@ -375,3 +386,41 @@ function sendNewParameters(data) {
 
 // All'avvio apriamo la home con il browser di default.
 open("http://localhost:3000/home");
+
+async function searchAlert(){
+    let query = "from(bucket: \"_monitoring\") |> range(start: -2m) " +
+        "|> filter(fn: (r) => r[\"_measurement\"] == \"statuses\")" +
+        "|> filter(fn: (r) => r[\"_check_name\"] == \"AQI Check\")" +
+        "|> filter(fn: (r) => r[\"_field\"] == \"_message\")" +
+        "|> filter(fn: (r) => r[\"_level\"] == \"crit\")"
+
+    //Salviamo in "data" tutti i dati che ci servono da influx
+    let data = []
+
+    //Scorriamo tutti i risultati della query
+    await queryClient.queryRows(query, {
+        next: (row, tableMeta) => {
+            const tableObject = tableMeta.toObject(row)
+            data.push(tableObject)
+        },
+        error: (error) => {
+            console.log('Error, i cannot load influx data.' + ' -> ' + error);
+        },
+        //Quando abbiamo completato formattiamo i dati come vogliamo e li restituiamo
+        complete: () => {
+            sendAlerts(data)
+        },
+    })
+}
+
+let jobAlert = new CronJob('45 */2 * * * *', async function () {
+    await searchAlert()
+});
+
+jobAlert.start();
+
+
+
+
+
+
