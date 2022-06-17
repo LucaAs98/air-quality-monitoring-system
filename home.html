@@ -58,7 +58,8 @@
 </figure>
 <figure class="text-center" id="loading">
     <div class="d-flex align-items-center">
-        <strong>Loading</strong>
+        <strong id="loading_text">Loading</strong>
+        <span></span>
         <div class="spinner-border ms-auto" role="status" aria-hidden="true"></div>
     </div>
 </figure>
@@ -115,7 +116,8 @@
                         <label for="protocol_dropdown" class="form-label"><strong>PROTOCOL:</strong></label>
                         <div class="dropdown">
                             <button class="btn btn-secondary dropdown-toggle" type="button" id="protocol_dropdown"
-                                    data-bs-toggle="dropdown" aria-expanded="false">MQTT</button>
+                                    data-bs-toggle="dropdown" aria-expanded="false">MQTT
+                            </button>
                             <ul class="dropdown-menu" aria-labelledby="protocol_dropdown">
                                 <li class="dropdown-item">MQTT</li>
                                 <li class="dropdown-item">COAP</li>
