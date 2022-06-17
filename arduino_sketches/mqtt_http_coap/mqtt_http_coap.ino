@@ -257,7 +257,7 @@ String calcoloValori() {
   i dati corretti per il nostro esp. */
 void initParameters() {
   bool ok = false;
-  String messaggioInit = String("{\"id\": \"" + client_id + "\", \"ip\": \"" + WiFi.localIP().toString() + "\"}");
+  String messaggioInit = String("{\"id\": \"" + client_id + "\", \"ip\": \"" + WiFi.localIP().toString() + "\", \"lt\":" + String(lat, 7) + ", \"ln\": " + String(lon, 7) + "}");
   initHTTP(serverInit);
   //Serial.println("Ho inviato il messaggio di inizializzazione");
   // Send HTTP POST request
