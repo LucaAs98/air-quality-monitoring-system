@@ -25,28 +25,6 @@ let org = process.env.ORG_INFLUX
 let bucket = process.env.BUCKET_INFLUX
 let queryClient = clientInflux.getQueryApi(org)
 
-/*
-//Imap
-const { MailListener } = require("mail-listener6");
-const mailListener = new MailListener({
-    username: variables.USER_IMAP,
-    password: variables.PSW_IMAP,
-    host: variables.HOST_IMAP,
-    port: 993,
-    tls: true,
-    connTimeout: 10000, // Default by node-imap
-    authTimeout: 5000, // Default by node-imap,
-    debug: null, // Or your custom function with only one incoming argument. Default: null
-    // tlsOptions: { rejectUnauthorized: false },
-    mailbox: "INBOX", // mailbox to monitor
-    searchFilter: ["ALL"], // the search filter being used after an IDLE notification has been retrieved
-    markSeen: true, // all fetched email willbe marked as seen and not fetched next time
-    fetchUnreadOnStart: true, // use it only if you want to get all unread email on lib start. Default is `false`,
-    attachments: true, // download attachments as they are encountered to the project directory
-    attachmentOptions: { directory: "attachments/" }
-});
-const initTime = new Date()*/
-
 //Telegram toker
 const tokenT = '5413400956:AAFa429GqUMqDwAKwU0ZcSi4rQOK_9UgGRI';
 // Create a bot that uses 'polling' to fetch new updates
@@ -59,6 +37,11 @@ let mapJobs = new Map()
 let activeUsers = new Map()
 let devices = new Map()
 
+//flag per il change o il set
+let flagChange = false
+
+getUserFirestore()
+
 //Per osservare gli errori di pooling
 bot.on("polling_error", console.log);
 
@@ -67,60 +50,11 @@ bot.onText(/\/start/, async (msg) => {
     let chatId = msg.chat.id;
 
     if (!activeUsers.has(chatId)) {
-        let strMsg = "Seleziona un dispositivo presente nella seguente lista:\n"
-        await updateDevices()
-
-        devices.forEach((coord, board) =>
-            strMsg += board + "\n"
-        )
-
-        strMsg += "Digita /set nomeDispositivo"
-
+        let strMsg = await listOfDevice(true)
         bot.sendMessage(chatId, strMsg).then(res => {
-            //Memorizzazione del tempo
-            bot.onText(/\/set (.+)/, async (msg) => {
-                if (!activeUsers.has(chatId)) {
-                    let textMsg = msg.text.substring(4).trim()
-
-                    let iteratorDevices = devices.keys()
-
-                    let result = true
-                    let valueIt
-                    do {
-                        valueIt = iteratorDevices.next()
-                        if (!valueIt.done) {
-
-                            if (textMsg === valueIt.value) {
-                                activeUsers.set(chatId, textMsg)
-                                result = false
-                            }
-                        } else {
-                            result = false
-                        }
-                    } while (result)
-
-
-                    if (!activeUsers.has(chatId)) {
-                        bot.sendMessage(chatId, "Errore nell'input!")
-                    } else {
-                        bot.sendMessage(chatId, "Scelta memorizzata!")
-
-                        console.log(activeUsers)
-                        let jsonData = {
-                            scheda: activeUsers.get(chatId),
-                            report: null
-                        }
-
-                        //Creaimo un doc chiamato con l'id e salviamo all'interno di esso tutti i dati relativi a quel determinato device
-                        let request = await db.collection('telegramuser').doc("" + chatId).set(jsonData).catch(err => console.log(err))
-                    }
-                } else {
-                    bot.sendMessage(msg.chat.id, `La selezione della scheda è stata già effettuata!`);
-                }
-
-            });
-        }).catch(() => {
-            bot.sendMessage(msg.chat.id, `Oops! An error has occured. Try again`);
+            bot.onText(/\/set (.+)/, async (msg) => setEsp(chatId, msg));
+        }).catch(err => {
+            bot.sendMessage(chatId, `Oops! An error has occured. Try again` + err);
         })
     } else {
         bot.sendMessage(msg.chat.id, `La selezione della scheda è stata già effettuata!`);
@@ -190,10 +124,10 @@ bot.onText(/\/periodic_report/, async (msg) => {
             let f = new Date()
             bot.sendMessage(
                 msg.chat.id,
-                `Hello! ${msg.chat.first_name}, how often do you want to be notified? Write the response in this format -> /save **h**m**s`
+                `Ciao! ${msg.chat.first_name}, ogni quanto vuoi essere notificato? Scrivi la risposta in questo formato -> /save **h**m**s`
             ).then(res => {
                 //Memorizzazione del tempo
-                bot.onText(/\/save (.+)/, (msg) => {
+                bot.onText(/\/save (.+)/, async (msg) => {
                     let pattern = /(([0-1][0-9]|2[0-3])h)([0-5][0-9]m)([0-5][0|5]s)/gi //pattern
                     let time = msg.text.match(pattern); //estrazione del pattern
                     //Controllo per verificare che la stringa in input segua abbia seguito il pattern
@@ -207,24 +141,15 @@ bot.onText(/\/periodic_report/, async (msg) => {
                         let m = parseInt(spl[1])
                         let s = parseInt(spl[2])
 
-                        f = addTime(f, h, m, s) //Ci calcoliamo quando deve essere visualizzato il nuovo report
-
-                        let strCronTime = createCronTimeString(f) //Creazione della string
-
-                        //Creazione del job periodico
-                        let job = new CronJob(strCronTime, async function () {
-                            let g = new Date()
-                            //Calcolo e settaggio del prossimo tempo di esecuzione
-                            g = addTime(g, h, m, s)
-                            this.setTime(new CronTime(createCronTimeString(g)))
-                            await sendQuery(chatId, 0)
-                        });
-                        //Start del job
-                        job.start();
-                        //Aggiunta del job ala mappa di quelli attivi
-                        mapJobs.set(chatId, job)
-
-                        bot.sendMessage(chatId, 'Report avviato!' + '\n\nNext: ' + f);
+                        createCronJob(chatId, f, h, m, s)
+                        await db.collection('telegramuser').doc(chatId + "").update({
+                            report: {
+                                h: h,
+                                m: m,
+                                s: s
+                            }
+                        }).catch(err => console.log(err))
+                        bot.sendMessage(chatId, 'Report avviato!');
                     }
                 });
             }).catch(() => {
@@ -246,19 +171,55 @@ bot.onText(/\/stop/, async (msg) => {
             mapJobs.get(chatId).stop()
             mapJobs.delete(chatId)
             bot.sendMessage(chatId, 'Report stoppato!');
+            await db.collection('telegramuser').doc(chatId + "").update({report: null}).catch(err => console.log(err))
         } else {
             bot.sendMessage(chatId, 'Non hai un report periodico attivo!');
         }
     }
 });
 
+bot.onText(/\/change_board/, async (msg) => {
+    let chatId = msg.chat.id;
+    if (initBoard(chatId)) {
+        let strMsg = await listOfDevice(false)
+        bot.sendMessage(chatId, strMsg).then(res => {
+            bot.onText(/\/change (.+)/, async (msg) => changeEsp(chatId, msg));
+        }).catch(err => {
+            bot.sendMessage(chatId, `Oops! An error has occured. Try again` + err);
+        })
+    }
+});
+
+//Stoppa il report periodico
+bot.onText(/\/disconnect/, async (msg) => {
+    let chatId = msg.chat.id;
+    if (initBoard(chatId)) {
+        await db.collection('telegramuser').doc(chatId + "").delete()
+        activeUsers.delete(chatId)
+        bot.sendMessage(chatId, 'Arrivederci! \u{1F44B}\u{1F44B}\u{1F44B}\n\n Digita /start per rincominciare');
+
+    }
+});
+
 async function getUserFirestore() {
-    const usersCollection = await db.collection('device').get();
-    //Per ognuno di essi assegnamo tutti i parametri necessari.
-    usersCollection.forEach((result) => {
-        if (result.id !== "default")
-            devices.set(result.id, {lat: 44.490931818740, long: 11.35460682369})
-    })
+
+    async function gUF() {
+        const usersCollection = await db.collection('telegramuser').get();
+        //Per ognuno di essi assegnamo tutti i parametri necessari.
+        usersCollection.forEach((result) => {
+            if (result.id !== "default") {
+                let resD = result.data()
+                let id = parseInt(result.id)
+                activeUsers.set(id, {scheda: resD.scheda, report: resD.report})
+                if (resD.report !== null) {
+                    createCronJob(id, new Date(), resD.report.h, resD.report.m, resD.report.s)
+                }
+            }
+        })
+    }
+
+    await gUF()
+    await updateDevices()
 }
 
 //Effettua la query su influx
@@ -278,11 +239,10 @@ async function sendQuery(chatId, idQuery) {
         complete: () => {
             if (data.length > 0) {
                 //Creazione del messaggio da mandare all'utente
-                let mess = createMessage(idQuery, data, activeUsers.get(chatId))
-                const d = new Date();
-                bot.sendMessage(chatId, mess + '\n\nData: ' + d);
+                let mess = createMessage(idQuery, data, activeUsers.get(chatId).scheda)
+                bot.sendMessage(chatId, mess);
             } else {
-                bot.sendMessage(chatId, "Error! Try later!");
+                bot.sendMessage(chatId, "Non sono presenti dati per il momento!");
             }
         },
     })
@@ -290,7 +250,7 @@ async function sendQuery(chatId, idQuery) {
 
 function createQuery(chatId, idQuery) {
 
-    let nameBoard = activeUsers.get(chatId)
+    let nameBoard = activeUsers.get(chatId).scheda
 
     switch (idQuery) {
         case 0:
@@ -322,8 +282,7 @@ function createQuery(chatId, idQuery) {
 function createMessage(idMessage, data, idEsp) {
 
     let board = devices.get(idEsp)
-
-    let mess = 'Bologna (BO) --- coord:' + board.lat + ',' + board.long + '\n\n'
+    let mess = board + '\n\n'
 
     switch (idMessage) {
         case 0: { //Query completa
@@ -392,13 +351,34 @@ function createCronTimeString(data) {
     return seconds + ' ' + minutes + ' ' + hours + ' * * *'
 }
 
+function createCronJob(chatId, data, h, m, s) {
+    data = addTime(data, h, m, s) //Ci calcoliamo quando deve essere visualizzato il nuovo report
+
+    let strCronTime = createCronTimeString(data) //Creazione della string
+
+    //Creazione del job periodico
+
+    let job = new CronJob(strCronTime, async function () {
+        let g = new Date()
+        //Calcolo e settaggio del prossimo tempo di esecuzione
+        g = addTime(g, h, m, s)
+        this.setTime(new CronTime(createCronTimeString(g)))
+        await sendQuery(chatId, 0)
+    });
+
+    //Start del job
+    job.start();
+    //Aggiunta del job ala mappa di quelli attivi
+    mapJobs.set(chatId, job)
+}
+
 //Metodo che prende tutti i device da firebase
 async function updateDevices() {
     const devicesCollection = await db.collection('device').get();
     //Per ognuno di essi assegnamo tutti i parametri necessari.
     devicesCollection.forEach((result) => {
-
-        activeUsers.set(result, {lat: 44.490931818740, long: 11.35460682369})
+        if (result.id !== "default")
+            devices.set(result.id, result.data().city)
     })
 }
 
@@ -411,8 +391,9 @@ function sendAlerts(alerts) {
 function avvisaUtenti(idEsp) {
 
     activeUsers.forEach((value, key) => {
-        if (value === idEsp)
-            bot.sendMessage(key, 'Livello AQI critico per scheda: ' + idEsp)
+        if (value.scheda === idEsp)
+            bot.sendMessage(key, '\u{26A0}\u{26A0}\u{26A0} ATTENZIONE \u{26A0}\u{26A0}\u{26A0}\n' +
+                'Livello AQI critico per scheda: ' + idEsp)
     })
 }
 
@@ -424,46 +405,102 @@ function initBoard(chatId) {
         return true
 }
 
-module.exports = sendAlerts
+async function listOfDevice(set) {
+    let strMsg = "Seleziona un dispositivo presente nella seguente lista:\n"
+    await updateDevices()
 
-/*
-mailListener.start();
+    devices.forEach((coord, board) =>
+        strMsg += board + "\n"
+    )
 
-mailListener.on("server:connected", function(){
-    console.log("imapConnected");
-});
+    if (set)
+        strMsg += "Digita /set nomeDispositivo"
+    else
+        strMsg += "Digita /change nomeDispositivo"
 
-mailListener.on("server:disconnected", function(){
-    console.log("imapDisconnected");
-});
+    return strMsg
+}
 
-mailListener.on("error", function(err){
-    console.log(err);
-});
+async function setEsp(chatId, msg) {
 
-mailListener.on("mail", function(mail, seqno) {
+    if (!activeUsers.has(chatId)) {
+        let textMsg = msg.text.substring(4).trim()
+        let iteratorDevices = devices.keys()
+        let result = true
+        let valueIt
+        do {
+            valueIt = iteratorDevices.next()
+            if (!valueIt.done) {
+                if (textMsg === valueIt.value) {
+                    let jsonData = {
+                        scheda: textMsg,
+                        report: null
+                    }
+                    activeUsers.set(chatId, jsonData)
+                    console.log(activeUsers)
+                    result = false
+                }
+            } else {
+                result = false
+            }
+        } while (result)
 
-    let d = new Date(mail.date)
-    if(d.getTime() > initTime.getTime()){
-
-        if(mail.subject === "Alert InfluxDB" && mail.from.text === "no-reply.6ayzrm@zapiermail.com"){
-            console.log("new email from no-reply.6ayzrm@zapiermail.com")
-
-            let patternId = /(Id:\w+)/g //pattern
-            let matchId = mail.text.match(patternId)
-
-            if (matchId != null)
-                avvisaUtenti(matchId[0])
+        if (!activeUsers.has(chatId)) {
+            bot.sendMessage(chatId, "Errore nell'input!")
+        } else {
+            bot.sendMessage(chatId, "Scelta memorizzata!")
+            //Creaimo un doc chiamato con l'id e salviamo all'interno di esso tutti i dati relativi a quel determinato device
+            let request = await db.collection('telegramuser').doc("" + chatId).set(activeUsers.get(chatId)).catch(err => console.log(err))
         }
+    } else {
+        bot.sendMessage(chatId, `La selezione della scheda è stata già effettuata!`);
     }
 
-    const array1 = ['a', 'b', 'c'];
-
-})
-
-function avvisaUtenti(idEsp){
-    activeUsers.forEach(
-        chatId =>
-        bot.sendMessage(chatId, 'Livello AQI critico per scheda: ' + idEsp))
 }
-*/
+
+async function changeEsp(chatId, msg) {
+
+    if (activeUsers.has(chatId)) {
+        let textMsg = msg.text.substring(8).trim()
+        let iteratorDevices = devices.keys()
+        let flagInterno = false
+        let result = true
+        let valueIt
+        do {
+            valueIt = iteratorDevices.next()
+            if (!valueIt.done) {
+                console.log(textMsg)
+                console.log(valueIt.value)
+                console.log(textMsg === valueIt.value)
+                if (textMsg === valueIt.value) {
+                    let jsonData = {
+                        scheda: textMsg,
+                        report: null
+                    }
+                    activeUsers.set(chatId, jsonData)
+                    console.log(activeUsers)
+                    result = false
+                    flagInterno = true
+                }
+            } else {
+                result = false
+            }
+        } while (result)
+
+        if (!flagInterno) {
+            bot.sendMessage(chatId, "Errore nell'input!")
+            console.log("miaoooo")
+        } else {
+            bot.sendMessage(chatId, "Scelta memorizzata!")
+            //Creaimo un doc chiamato con l'id e salviamo all'interno di esso tutti i dati relativi a quel determinato device
+            let request = await db.collection('telegramuser').doc("" + chatId).set(activeUsers.get(chatId)).catch(err => console.log(err))
+        }
+
+        flagChange = false
+    } else {
+        bot.sendMessage(chatId, `Non hai ancora selezionato la tua scheda`);
+    }
+
+}
+
+module.exports = sendAlerts
