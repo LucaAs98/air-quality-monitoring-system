@@ -311,7 +311,7 @@ bot.onText(/\/disconnect/, async (msg) => {
     if (initBoard(chatId)) {
         await db.collection('telegramuser').doc(chatId + "").delete()
         activeUsers.delete(chatId)
-        bot.sendMessage(chatId, 'Goodbye! \u{1F44B}\u{1F44B}\u{1F44B}\n\n Type / start to start over!');
+        bot.sendMessage(chatId, 'Goodbye! \u{1F44B}\u{1F44B}\u{1F44B}\n\n Type /start to start over!');
     }
 });
 
