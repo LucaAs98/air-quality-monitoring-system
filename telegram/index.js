@@ -190,7 +190,7 @@ bot.onText(/\/aqi/, async (msg) => {
 bot.onText(/\/periodic_report/, async (msg) => {
     let mappaValori = {"ore1": 0, "ore2": 0, "min1": 0, "min2": 0}
     let chatId = msg.chat.id;
-    let message = "Ogni quanto vuoi essere notificato? Selezionalo qui:"
+    let message = "How often do you want to be notified? Select it here:"
     let initOpts = {
         "parse_mode": "Markdown",
         "reply_markup":
