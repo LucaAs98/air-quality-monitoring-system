@@ -1,11 +1,11 @@
 /** Inizializzazione NODEJS **/
 require('dotenv').config();
 let variables = process.env
-const pointCreation = require("./receiver")
 const express = require("express");
 const open = require('open');
 const app = express();
 const sendAlerts = require("./telegram/index")
+const pointCreation = require("./receiver")
 const axios = require("axios");
 
 app.set('views', __dirname + '/');
@@ -136,6 +136,7 @@ app.post("/update_device", async (req, res) => {
         min_gas_value: req.body.min_gas_value,
         protocol: req.body.protocol.trim(),
         sample_frequency: req.body.sample_frequency,
+        prima_richiesta: true,  //Serve per non far partire subito il conteggio dei delay di coap quando cambia protocollo
     };
 
     //Aggiorniamo il device a quel determinato id
@@ -172,11 +173,11 @@ function createCoAPJob(id, sF) {
     let d = new Date()
     d.setMilliseconds(d.getMilliseconds() + sampleFrequency)
     let job = new CronJob(createCronTimeString(d), async function () {
+        await coapRequest(id);
         let g = new Date()
         //Calcolo e settaggio del prossimo tempo di esecuzione
         g.setMilliseconds(g.getMilliseconds() + sampleFrequency)
         this.setTime(new CronTime(createCronTimeString(g)))
-        await coapRequest(id);
     });
     //Start del job
     console.log("Avvio Job di -> " + id)
@@ -212,23 +213,36 @@ async function coapRequest(id) {
                 }
             }
 
+            let tempoInizPerformance = new Date()
+            let tempoFinalPerformance = tempoInizPerformance
+
             let req = await coap.request(options)
             let jsonData
 
             req.on('response', function (res) {
                 if (res.code !== '2.05') return console.log("CoAP Error!");
-
                 res.on('data', function () {
                     jsonData = JSON.parse(res.payload)
                 });
                 res.on('end', async function () {
                     if (res.code === '2.05') {
+                        if (!obj.prima_richiesta)
+                            tempoFinalPerformance = new Date()
+                        else obj.prima_richiesta = false
+
                         console.log("COAP " + id + " -> " + JSON.stringify(jsonData))
-                        await pointCreation(jsonData)
+                        jsonData.delayMess = tempoInizPerformance - tempoFinalPerformance
+                        await pointCreation(jsonData, "COAP")
                     } else {
                         console.log('[coap] coap res.code=' + res.code);
                     }
                 });
+            })
+            req.on('timeout', function (err) {
+                console.error(err)
+            })
+            req.on('error', function (err) {
+                console.error(err)
             })
             req.end();
         } else {
@@ -262,7 +276,7 @@ app.post("/remove_device", async (req, res) => {
 app.post('/sensordata', async function (req, res) {
     let message = req.body
     console.log("HTTP " + req.body.i + " -> " + JSON.stringify(req.body))
-    await pointCreation(message)
+    await pointCreation(message, "HTTP")
     res.end();
 });
 
@@ -274,7 +288,6 @@ app.post('/initialize', async function (req, res) {
 
     //Prendiamo la temperatura da openWeatherMap
     let espPosition = await axios.get(urlOpenWeather).then(response => {
-        console.log(response.data)
         return response.data.name + " - " + response.data.sys.country
     }).catch(error => {
         console.error("Errore! Non sono riuscito a prendere la posizione dell'esp!")
@@ -317,7 +330,8 @@ async function getDevices() {
             sample_frequency: resD.sample_frequency,
             protocol: resD.protocol.trim(),
             lat: 44.490931818740,
-            long: 11.35460682369
+            long: 11.35460682369,
+            prima_richiesta: true
         }
         if (resD.ip !== undefined) {
             data.ip = resD.ip
@@ -325,13 +339,12 @@ async function getDevices() {
 
         arrayESP32.push(data)
 
-        if (resD.protocol === 'COAP') {
+        if (resD.protocol.trim() === 'COAP') {
             if (!mapJobs.has(result.id)) {
                 createCoAPJob(result.id, resD.sample_frequency)
             }
         }
     })
-
     //Restituiamo tutti i device
     return arrayESP32
 }
@@ -387,7 +400,7 @@ function sendNewParameters(data) {
 // All'avvio apriamo la home con il browser di default.
 open("http://localhost:3000/home");
 
-async function searchAlert(){
+async function searchAlert() {
     let query = "from(bucket: \"_monitoring\") |> range(start: -2m) " +
         "|> filter(fn: (r) => r[\"_measurement\"] == \"statuses\")" +
         "|> filter(fn: (r) => r[\"_check_name\"] == \"AQI Check\")" +
@@ -418,9 +431,3 @@ let jobAlert = new CronJob('45 */2 * * * *', async function () {
 });
 
 jobAlert.start();
-
-
-
-
-
-

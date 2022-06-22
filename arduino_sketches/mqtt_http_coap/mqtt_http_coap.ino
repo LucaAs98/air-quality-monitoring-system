@@ -45,6 +45,7 @@ String initString = "Sto facendo la richiesta di inizializzazione...";
 //MQTT
 const char *mqtt_broker = "broker.emqx.io";
 const char *topic = "sensor/values";
+const char *topicDelay = "delay";
 const char *topicReceive = String("device/parameters/" + client_id).c_str();
 const char *mqtt_username = "emqx";
 const char *mqtt_password = "public";
@@ -204,22 +205,25 @@ String creaMessaggio(float temperature, float humidity, float gas, int aqi, floa
 }
 
 //Stampa gli errori o i successi della connessione http, return true se è andato tutto bene
-void stampaErroriHTTP(int httpResponseCode) {
+boolean stampaErroriHTTP(int httpResponseCode) {
+  bool ok = true;
   if (httpResponseCode > 0) {
     Serial.print("HTTP Response code: ");
   } else {
     Serial.print("Error code: ");
+    ok = false;
   }
   Serial.println(httpResponseCode);
   if (httpResponseCode == 501) {
     Serial.println("Nessun dispositivo registrato con questo id!");
+    ok = false;
   }
+  return ok;
 }
 
 // CoAP server endpoint URL
 void callback_sensordata(CoapPacket &packet, IPAddress ip, int port) {
   const char *messaggio = calcoloValori().c_str();
-
   coap.sendResponse(ip, port, packet.messageid, messaggio,
                     strlen(messaggio), COAP_CONTENT, COAP_APPLICATION_JSON,
                     packet.token, packet.tokenlen);
@@ -256,13 +260,10 @@ String calcoloValori() {
 /* Mandiamo il messaggio al server per inizializzare i parametri dell'esp, tramite l'id il server ci riconoscerà e ci invierà
   i dati corretti per il nostro esp. */
 void initParameters() {
-  bool ok = false;
   String messaggioInit = String("{\"id\": \"" + client_id + "\", \"ip\": \"" + WiFi.localIP().toString() + "\", \"lt\":" + String(lat, 7) + ", \"ln\": " + String(lon, 7) + "}");
   initHTTP(serverInit);
-  //Serial.println("Ho inviato il messaggio di inizializzazione");
   // Send HTTP POST request
   int httpResponseCode = http.POST(messaggioInit);
-  //ok = stampaErroriHTTP(httpResponseCode);
   // Free resources
   http.end();
 }
@@ -306,6 +307,7 @@ void setup() {
 
 //LOOP
 void loop() {
+  float tempoInizDelay = 0;
   if (WiFi.status() == WL_CONNECTED) {
     if (!inizializzato) {
       Serial.print(initString);
@@ -324,8 +326,13 @@ void loop() {
 
         initHTTP(serverName);
         // Send HTTP POST request
+        tempoInizDelay = millis();
         int httpResponseCode = http.POST(messaggio);
-        stampaErroriHTTP(httpResponseCode);
+        float delay = tempoInizDelay - millis();
+        bool ok = stampaErroriHTTP(httpResponseCode);
+        if(ok){
+           client.publish(topicDelay, String("{\"id\": \"" + client_id +"\" , \"delay\": " + String(delay) + ", \"protocol\": \"HTTP\" }").c_str());
+        }
         // Free resources
         http.end();
       }
