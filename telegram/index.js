@@ -311,6 +311,12 @@ bot.onText(/\/disconnect/, async (msg) => {
     if (initBoard(chatId)) {
         await db.collection('telegramuser').doc(chatId + "").delete()
         activeUsers.delete(chatId)
+        if (mapJobs.has(chatId)) {
+            //Stop e rimozione del job
+            mapJobs.get(chatId).stop()
+            mapJobs.delete(chatId)
+        }
+        bot.sendMessage(chatId, 'Report stopped!');
         bot.sendMessage(chatId, 'Goodbye! \u{1F44B}\u{1F44B}\u{1F44B}\n\n Type /start to start over!');
     }
 });
