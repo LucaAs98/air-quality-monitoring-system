@@ -1,5 +1,6 @@
-import pandas as pd
 import sys
+
+import pandas as pd
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 from prophet import Prophet
@@ -13,13 +14,15 @@ client = InfluxDBClient(url="https://eu-central-1-1.aws.cloud2.influxdata.com", 
 query_api = client.query_api()
 write_api = client.write_api(write_options=SYNCHRONOUS)
 
-
 esp = sys.argv[1]
+field = sys.argv[2]
+pathModel = sys.argv[3]
+
 query = 'from(bucket: "' + bucket + '")' \
                                     ' |> range(start: -24h)' \
                                     ' |> filter(fn: (r) => r._measurement == "measurements")' \
-                                    ' |> filter(fn: (r) => r._field == "temperature")' \
-                                    ' |> filter(fn: (r) => r.id == "' + esp + '")'
+                                    ' |> filter(fn: (r) => r._field == "' + field + '")' \
+                                                                                    ' |> filter(fn: (r) => r.id == "' + esp + '")'
 
 result = client.query_api().query(org=org, query=query)
 
@@ -28,7 +31,6 @@ for table in result:
     for record in table.records:
         raw.append((record.get_value(), record.get_time()))
 
-
 df = pd.DataFrame(raw, columns=['y', 'ds'], index=None)
 df['ds'] = df['ds'].values
 
@@ -36,5 +38,5 @@ print(df)
 model = Prophet(interval_width=0.95)
 model.fit(df)
 
-with open('./prophetForecasting/models/' + esp + 'serialized_model.json', 'w') as fout:
+with open(pathModel, 'w') as fout:
     fout.write(model_to_json(model))

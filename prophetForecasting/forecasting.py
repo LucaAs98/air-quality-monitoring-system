@@ -1,10 +1,13 @@
-from prophet.serialize import model_from_json
 import sys
 
-esp = sys.argv[1]
-with open('./prophetForecasting/models/'+esp+'serialized_model.json', 'r') as fin:
+from prophet.serialize import model_from_json
+
+sf = int((int(sys.argv[1])) / 1000)
+path = sys.argv[2]
+
+with open(path, 'r') as fin:
     m = model_from_json(fin.read())  # Load model
-time = int(sys.argv[2])
-future_dates = m.make_future_dataframe(periods=time, freq="s")
+
+future_dates = m.make_future_dataframe(periods=sf, freq="s")
 forecast = m.predict(future_dates)
 print(forecast.yhat.iloc[-1])

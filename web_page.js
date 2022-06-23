@@ -5,7 +5,7 @@ const express = require("express");
 const open = require('open');
 const app = express();
 const sendAlerts = require("./telegram/index")
-const pointCreation = require("./receiver")
+const {pointCreation} = require("./receiver")
 const axios = require("axios");
 
 app.set('views', __dirname + '/');
@@ -164,6 +164,13 @@ app.post("/update_device", async (req, res) => {
         default:
             console.log('Stringa!')
     }
+    res.end();
+});
+
+app.get("/training", async (req, res) => {
+    //const id = req.body.id
+    let id = "esp32_caio"
+    //await trainModel(id)
     res.end();
 });
 
@@ -431,3 +438,5 @@ let jobAlert = new CronJob('45 */2 * * * *', async function () {
 });
 
 jobAlert.start();
+
+
