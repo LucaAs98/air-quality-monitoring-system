@@ -1,3 +1,4 @@
+/** Inizializzazione slider per aggiunta nuovo dispositivo **/
 let id = "home"
 setSliderBehaviour(id, "min_gas_value")
 setSliderBehaviour(id, "max_gas_value")
@@ -23,16 +24,15 @@ async function getDevices() {
     const responseInflux = await fetch('/get_influx_data');
     window.influxData = await responseInflux.json()
 
+    $("#loading").hide()                    //Nascondiamo la scritta di caricamento
     if (window.arrayESP32.length > 1) {
-        $("#loading").hide()
-        addDevices();
+        addDevices();                       //Aggiungiamo i device alla schermata
     } else {
-        $("#no_device").show()
-        $("#loading").hide()
+        $("#no_device").show()              //Mostriamo la scritta che non ci sono device da visualizzare
     }
 }
 
-//Funzione che combina i dati di influx con quelli di firestore. Aggiugne infine le carte con tali dati
+//Funzione che combina i dati di influx con quelli di firestore. Aggiunge infine le carte con tali dati
 async function addDevices() {
     //Scorriamo tutti i dispositivi che vogliamo visualizzare
     window.arrayESP32.forEach((dataFirestore) => {
@@ -93,10 +93,9 @@ function aggiungiCarta(dataFirestore, dataInflux) {
 }
 
 
-//Funzione chiamata al click del bottone "Vedi su Grafana"
+//Funzione chiamata al click del bottone "Vedi su Grafana", apriamo la dashboard relativa al device su grafana.
 function visualizeGrafanaGraphs(id) {
     window.open("http://localhost:4000/d/BWTZxxr7z/iotproject2022?orgId=1&refresh=5s&from=now-5m&to=now&theme=dark&&var-id=" + id, '_blank').focus();
-    //Visualizza grafico per esp + dataFirestore.id, potremmo farlo visualizzare sotto, oppure restituire solo il link
 }
 
 //Funzione chiamata al click del bottone "Rimuovi"
@@ -141,6 +140,7 @@ function nuovoLayerMappa() {
     })
 }
 
+//Colora lo slider in mezzo ai valori scelti
 function fillColor(sliderMin, sliderMax, sliderMaxValue, sliderTrack) {
     let percent1 = (sliderMin.value / sliderMaxValue) * 100;
     let percent2 = (sliderMax.value / sliderMaxValue) * 100;
@@ -191,8 +191,8 @@ function creaDivCarta(dataFirestore, dataInflux) {
                 <div class="wrapper">
                     <div class="container">
                         <div class="slider-track" id=slider-track-${dataFirestore.id}></div>
-                        <input class="min_gas_value" type="range" min="0" max="200" value=${dataFirestore.min_gas_value} step="10" id=slider-1-${dataFirestore.id}>
-                        <input class="max_gas_value" type="range" min="0" max="200" value=${dataFirestore.max_gas_value} step="10" id=slider-2-${dataFirestore.id}>
+                        <input class="min_gas_value" type="range" min="0" max="10000" value=${dataFirestore.min_gas_value} step="10" id=slider-1-${dataFirestore.id}>
+                        <input class="max_gas_value" type="range" min="0" max="10000" value=${dataFirestore.max_gas_value} step="10" id=slider-2-${dataFirestore.id}>
                     </div>
                     <div class="row label-min-max">
                         <div class="col-6">
@@ -231,7 +231,6 @@ function creaDivCarta(dataFirestore, dataInflux) {
         </div>
     </div>`
 }
-
 
 //Settiamo il comportamento del modal del cambio dei parametri per ciascun esp
 function setChangeParamBehaviour(dataFirestore) {
@@ -273,24 +272,23 @@ function setChangeParamBehaviour(dataFirestore) {
                     // Aggiorniamo il contenuto del modal, prendiamo i campi
                     let modalBodyInputSample = modal.querySelector(`.modal-body input#sample_frequency_value_${dataFirestore.id}`);
                     let modalBodyInputProtocol = modal.querySelector(`.modal-body button#protocol_dropdown_${dataFirestore.id}`);
-
-
+                    //Prendiamo il nuovo protocollo selezionato
                     let newProtocol = modalBodyInputProtocol.textContent.trim()
-
+                    //Prendiamo il vecchio protocollo per verificare che ci sia stato o meno un passaggio da "qualcosa" a COAP
                     let oldProtocol = arrayESP32.find(e => e.id === dataFirestore.id).protocol
-                    let coapOp
+                    let coapOp      //Operazione da fare a seconda di oldProtocol
 
                     if (oldProtocol !== newProtocol) {
                         if (newProtocol === 'COAP') {
-                            coapOp = 0
+                            coapOp = 0      //Avvia nuovo job coap
                         } else {
                             if (oldProtocol === 'COAP' && newProtocol !== 'COAP') {
-                                coapOp = 1
+                                coapOp = 1  //Ferma job coap
                             } else
-                                coapOp = 2
+                                coapOp = 2  //Non fare niente
                         }
                     } else {
-                        coapOp = 2
+                        coapOp = 2          //Non fare niente
                     }
 
                     //Estraiamo i dati dai vari campi e creiamo l'oggetto con i nuovi valori
@@ -310,6 +308,7 @@ function setChangeParamBehaviour(dataFirestore) {
                 }
             });
 
+            //Ogni volta che modifichiamo lo slider aggiorniamo il tutto
             $('input[type=range]').on('input', function () {
                 let sliderClass = $(this).attr("class").split(" ")[0]
                 setSliderBehaviour(dataFirestore.id, sliderClass)
@@ -318,6 +317,7 @@ function setChangeParamBehaviour(dataFirestore) {
     );
 }
 
+//Setta come avviene la gestione degli slider
 function setSliderBehaviour(id, sliderClass) {
     let sliderMin = document.getElementById(`slider-1-${id}`);
     let sliderMax = document.getElementById(`slider-2-${id}`);
@@ -327,7 +327,7 @@ function setSliderBehaviour(id, sliderClass) {
     let sliderTrack = document.getElementById(`slider-track-${id}`);
     let sliderMaxValue = document.getElementById(`slider-1-${id}`).max;
 
-
+    //Settiamo i limiti per i valori max e min
     if (sliderClass === "max_gas_value") {
         if (parseInt(sliderMax.value) - parseInt(sliderMin.value) <= minGap) {
             sliderMax.value = parseInt(sliderMin.value) + minGap;

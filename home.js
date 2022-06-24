@@ -79,7 +79,6 @@ function setAddDeviceBehaviour() {
                     window.location.reload();
                 }
             }
-
         });
     })
 }

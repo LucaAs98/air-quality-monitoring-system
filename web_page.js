@@ -52,10 +52,9 @@ let queryClient = clientInflux.getQueryApi(org)
 const coap = require('coap')
 const CronJob = require('cron').CronJob;
 const CronTime = require('cron').CronTime;
-//mappa lista dei job attivi
-let mapJobs = new Map()
+let mapJobs = new Map()     //Mappa lista dei job attivi
 
-
+//Contiene gli esp presenti su firebase
 let arrayESP32 = [];
 
 /*** Richieste GET ***/
@@ -79,7 +78,7 @@ app.get("/devices", async (req, res) => {
 /* Ad URL "/get_influx_data" chiediamo di prendere i dati da influxdB. */
 app.get("/get_influx_data", async (req, res) => {
     let fluxQuery =
-        `from(bucket: "${variables.BUCKET_INFLUX}")
+        `from(bucket: "${bucket}")
                 |> range(start: -1d)
                 |> filter(fn: (r) => r["_field"] != "_message")
                 |> group(columns: ["id", "_field"])
@@ -147,49 +146,53 @@ app.post("/update_device", async (req, res) => {
     //Dopo aver aggiornato i dati su firestore andiamo a comunicarli anche all'esp32
     sendNewParameters(data);
 
-
+    //Prendiamo quale operazione coap dobbiamo effettuare dopo l'aggiornamento dei parametri
     let coapOp = parseInt(req.body.cop)
 
+    //Scegliamo quale operazione effettuare
     switch (coapOp) {
-        case 0:
+        case 0:     //Crea nuovo Job (Passato da qualcos'altro a COAP)
             if (!mapJobs.has(id))
                 createCoAPJob(id, data.sample_frequency)
             break;
-        case 1:
+        case 1:     //Stoppa Job (Passato da coap a qualcos'altro)
             if (mapJobs.has(id)) {
                 mapJobs.get(id).stop()
                 mapJobs.delete(id)
             }
             break;
-        default:
-            console.log('Stringa!')
     }
     res.end();
 });
 
-app.get("/training", async (req, res) => {
+//Quando premiamo il bottone del forecasting avviamo tutto il procedimento di esso
+app.post("/forecasting", async (req, res) => {
     //const id = req.body.id
     let id = "esp32_caio"
     //await trainModel(id)
     res.end();
 });
 
+//Creazione del job COAP
 function createCoAPJob(id, sF) {
+    //Ogni quanto effettuare una richiesta COAP
     let sampleFrequency = parseInt(sF)
     console.log("Creazione Job per -> " + id)
     let d = new Date()
+    //Aggiungiamo i millisecondi della sampleFrequency alla data di ora
     d.setMilliseconds(d.getMilliseconds() + sampleFrequency)
+    //Creiamo il job
     let job = new CronJob(createCronTimeString(d), async function () {
-        await coapRequest(id);
+        await coapRequest(id);      //Facciamo la richiesta all'esp
         let g = new Date()
         //Calcolo e settaggio del prossimo tempo di esecuzione
         g.setMilliseconds(g.getMilliseconds() + sampleFrequency)
         this.setTime(new CronTime(createCronTimeString(g)))
     });
-    //Start del job
+    //Start effettivo del job
     console.log("Avvio Job di -> " + id)
     job.start();
-    //Aggiunta del job ala mappa di quelli attivi
+    //Aggiunta del job alla mappa di quelli attivi
     mapJobs.set(id, job)
 }
 
@@ -202,13 +205,19 @@ function createCronTimeString(d) {
     return seconds + ' ' + minutes + ' ' + hours + ' * * *'
 }
 
+//Richiesta COAP all'esp
 async function coapRequest(id) {
+    //Prendiamo i dati dell'esp alla quale fare la richiesta
     let obj = arrayESP32.filter(obj => obj.id === id)[0]
 
+    //Se l'esp scelto esiste
     if (obj !== undefined) {
+        //IP del device alla quale fare richiesta
         let broker_address = obj.ip
 
+        //Se abbiamo ricevuto l'ip del device alla quale fare richiesta
         if (broker_address !== undefined) {
+            //Settiamo le options per la richiesta COAP
             var options = {
                 host: broker_address,
                 port: 5683,
@@ -220,19 +229,27 @@ async function coapRequest(id) {
                 }
             }
 
+            //Settiamo le variabili per il delay
             let tempoInizPerformance = new Date()
-            let tempoFinalPerformance = tempoInizPerformance
+            //Inizializzata in questo modo perchè se il delay corrisponde a zero significa che c'è stato qualche problema
+            let tempoFinalPerformance = tempoInizPerformance        //Conterrà il tempo finale (ricezione messaggio COAP)
 
+            //Effettua la richiesta effettiva
             let req = await coap.request(options)
-            let jsonData
+            let jsonData    //Variabile nella quale salveremo il messaggio ricevuto
 
+            //Una volta che riceviamo la risposta COAP controlliamo che sia andato tutto a buon fine
             req.on('response', function (res) {
+                //Se il codice ricevuto come risposta è dioverso 2.05 abbiamo un errore
                 if (res.code !== '2.05') return console.log("CoAP Error!");
+                //Altrimenti se riceve dati andiamo a fare il parse JSON del messaggio
                 res.on('data', function () {
                     jsonData = JSON.parse(res.payload)
                 });
                 res.on('end', async function () {
+                    //Al termine della richiesta  se è tutto apposto inviamo il delay al db e creiamo il punto
                     if (res.code === '2.05') {
+                        //Alla prima richiesta non mandiamo il delay perchè ci può essere ancora in esecuzione l'invio di un messaggio precedente
                         if (!obj.prima_richiesta)
                             tempoFinalPerformance = new Date()
                         else obj.prima_richiesta = false
@@ -241,6 +258,7 @@ async function coapRequest(id) {
                         jsonData.delayMess = tempoInizPerformance - tempoFinalPerformance
                         await pointCreation(jsonData, "COAP")
                     } else {
+                        //Stampiamo l'errore
                         console.log('[coap] coap res.code=' + res.code);
                     }
                 });
@@ -253,20 +271,25 @@ async function coapRequest(id) {
             })
             req.end();
         } else {
+            //Se non abbiamo ancora ricevuto l'ip del device alla quale fare richiesta
             console.log("Non ho a disposizione l'ip del dispositivo " + id + "!")
         }
     } else {
+        //Se il dispositivo scelto non esiste
         console.log("Il dispositivo non è presente nel database!")
     }
 }
 
 //Rimuoviamo un device togliendolo da firestore in modo tale da non poterlo più visualizzare nella webpage
 app.post("/remove_device", async (req, res) => {
+    //Rimuoviamo il device da firestore
     const request = await db.collection('device').doc(req.body.id).delete()
+    //Se sono presenti job con tale device li stoppiamo
     if (mapJobs.has(req.body.id)) {
         mapJobs.get(req.body.id).stop()
         mapJobs.delete(req.body.id)
     }
+
     //Segnaliamo all'esp che è stato rimosso dal db
     let parameters = {
         id: req.body.id,
@@ -275,6 +298,7 @@ app.post("/remove_device", async (req, res) => {
         sample_frequency: 1000,
         protocol: "UNDEFINED"
     }
+    //Inviamo la segnalazione
     sendNewParameters(parameters)
     res.end()
 })
@@ -301,8 +325,11 @@ app.post('/initialize', async function (req, res) {
     })
 
     console.log("Richiesta inizializzazione da parte di -> " + message.ip)
+
+    //Prendiamo i parametri Salvati in precedenza da firebase
     let parameters = arrayESP32.filter(obj => obj.id === message.id)[0]
 
+    //Se ci sono parametri allora settiamo anche l'ip del device e aggiorniamo il suo ip anche su firebase
     if (parameters !== undefined) {
         parameters.ip = message.ip;
         //Aggiorniamo il device a quel determinato id aggiungendo l'ip
@@ -314,6 +341,7 @@ app.post('/initialize', async function (req, res) {
         })
         arrayESP32.filter(obj => obj.id === parameters.id)[0] = parameters.ip;
         parameters.id = message.id
+        //Mandiamo i parametri di inizializzazione all'esp
         sendNewParameters(parameters)
         res.end()
     } else {
@@ -336,7 +364,7 @@ async function getDevices() {
             min_gas_value: resD.min_gas_value,
             sample_frequency: resD.sample_frequency,
             protocol: resD.protocol.trim(),
-            lat: 44.490931818740,
+            lat: 44.490931818740,       /******************** CONTROLLA *************/
             long: 11.35460682369,
             prima_richiesta: true
         }
@@ -346,6 +374,7 @@ async function getDevices() {
 
         arrayESP32.push(data)
 
+        //Se il device ha settato come protocollo COAP creiamo il suo job
         if (resD.protocol.trim() === 'COAP') {
             if (!mapJobs.has(result.id)) {
                 createCoAPJob(result.id, resD.sample_frequency)
@@ -391,6 +420,7 @@ function influxDataFormat(data) {
     return newData
 }
 
+//Funzione per inviare i vari parametri al nostro esp
 function sendNewParameters(data) {
     clientMQTT.publish(topics[0] + data.id, createMessage(data.protocol, data.sample_frequency, data.max_gas_value, data.min_gas_value), {
         qos: 0,
@@ -407,6 +437,7 @@ function sendNewParameters(data) {
 // All'avvio apriamo la home con il browser di default.
 open("http://localhost:3000/home");
 
+//Funzione che resta in loop (ogni due min) alla ricerca di nuovi alert da influx
 async function searchAlert() {
     let query = "from(bucket: \"_monitoring\") |> range(start: -2m) " +
         "|> filter(fn: (r) => r[\"_measurement\"] == \"statuses\")" +
@@ -426,17 +457,16 @@ async function searchAlert() {
         error: (error) => {
             console.log('Error, i cannot load influx data.' + ' -> ' + error);
         },
-        //Quando abbiamo completato formattiamo i dati come vogliamo e li restituiamo
+        //Quando abbiamo completato mandiamo gli alert su telegram
         complete: () => {
             sendAlerts(data)
         },
     })
 }
 
+//Creazione del job per gli alert
 let jobAlert = new CronJob('45 */2 * * * *', async function () {
     await searchAlert()
 });
 
 jobAlert.start();
-
-

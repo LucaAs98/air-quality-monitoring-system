@@ -1,13 +1,7 @@
 require('dotenv').config();
 let variables = process.env
-
 const axios = require("axios");
 const fs = require('fs')
-
-//time series forecasting
-const timeseries = require("timeseries-analysis");
-const sampleDim = 78
-const degree = 1
 
 //Inizializza MQTT
 const mqtt = require('mqtt')
@@ -21,8 +15,8 @@ const clientMQTT = mqtt.connect(connectUrl, {
     password: variables.PASSWORD_MQTT,
     reconnectPeriod: 1000,
 })
-const topic1 = "sensor/values"
-const topic2 = "delay"      //Topic per la ricezione del delay calcolato sull'esp
+const topic1 = "sensor/values"      //Topic per la ricezione dei valori dell'esp
+const topic2 = "delay"              //Topic per la ricezione del delay calcolato sull'esp
 const topics = [topic1, topic2]
 
 //INFLUXDB
@@ -35,28 +29,33 @@ const clientInflux = new InfluxDB({url, token})
 let writeClient = clientInflux.getWriteApi(org, bucket, 'ns')
 let queryClient = clientInflux.getQueryApi(org)
 
-//Forecasting
+/** FORECASTING */
+const tempoNuovoForecast = 120000 //Tempo dopo la quale effettuare un nuovo forecast (in millisecondi)
+//Forecasting con "time series forecasting"
+const timeseries = require("timeseries-analysis");
+const sampleDim = 78        //Contiene il numero di sample da considerare per effetuare il forecast
+const degree = 1            //Numero di coefficienti da calcolare
+
+
+//Forecasting FBProphet
 const {exec} = require("child_process");
 const path = require("path");
-const environmentName = "air-quality-monitoring-system"
-const folderpath = path.resolve()
-const pythonScriptTrain = folderpath + "\\prophetForecasting\\fitmodel.py"
-const pythonScriptForecast = folderpath + "\\prophetForecasting\\forecasting.py"
-const measurementForecast = "forecastingExample"
-let mapForecasting = new Map()
+const environmentName = "air-quality-monitoring-system"                                 //Nome dell'environment conda
+const folderPath = path.resolve()                                                       //Path dove risiede questo script
+const pythonScriptTrain = folderPath + "\\prophetForecasting\\fitmodel.py"              //Path dove salvare i coefficienti
+const pythonScriptForecast = folderPath + "\\prophetForecasting\\forecasting.py"        //Path dello script che esegue FBProphet
+const measurementForecast = "forecastingExample"                                        //Measurement per salvare i dati del forecast
+let mapForecasting = new Map()                                                          //Segna per ogni scheda attiva quando è stato eseguito l'ultimo forecast (FBProphet)
 
 //FIREBASE
 let admin = require("firebase-admin");
 let db = admin.firestore();
 
-let flagfor = false
-
-
 /** MQTT **/
 //Quando riceve un messaggio MQTT
 clientMQTT.on('message', async (topic, payload) => {
     if (topic !== topics[1]) {
-        //Abbiamo ricevuto un messaggio tramite MQTT
+        //Abbiamo ricevuto un messaggio tramite MQTT al primo topic
         if (payload.toString() !== "Errore") {
             let message = JSON.parse(payload.toString())
             console.log('MQTT ' + message.i + ' -> ' + JSON.stringify(message))
@@ -65,7 +64,7 @@ clientMQTT.on('message', async (topic, payload) => {
             console.log("Non sono riuscito a leggere i dati dai sensori!")
         }
     } else {
-        //Dobbiamo inviare il nuovo delay a firebase
+        //Dobbiamo inviare il nuovo delay a firebase, secondo topic
         if (payload.toString() !== "Errore") {
             let message = JSON.parse(payload.toString())
             await sendDelays(message.id, message.delay, message.protocol)
@@ -83,21 +82,24 @@ clientMQTT.on('connect', () => {
     })
 })
 
+//Funzione per creare il punto da salvare su influx
 async function pointCreation(message, protocol) {
+    //Prepariamo i valori da salvare
     let id = message.i
     let temp = parseFloat(message.t).toFixed(2)
     let hum = parseFloat(message.h).toFixed(2)
     let gas = parseFloat(message.g).toFixed(2)
 
-    if(!mapForecasting.has(id)){
+    //Se non ha alcun forecast si avvia altrimenti controlliamo se è il momento di farne un altro
+    if (!mapForecasting.has(id)) {
         totalForecast(id, temp, hum, gas)
         mapForecasting.set(id, new Date())
-    }else{
+    } else {
         let d = new Date()
-        //120000 due minuti
-        if((d-mapForecasting.get(id)) > 120000){
+        //Se è il momento di fare un nuovo forecast, lo avviamo
+        if ((d - mapForecasting.get(id)) > tempoNuovoForecast) {
             totalForecast(id, temp, hum, gas)
-            mapForecasting.set(id, d)
+            mapForecasting.set(id, d)       //Settiamo il nuovo tempo di inizio dell'ultimo forecast
         }
     }
 
@@ -111,8 +113,10 @@ async function pointCreation(message, protocol) {
         console.error("Errore! Non sono riuscito a fare la richiesta a OpenWeatherMap")
     })
 
+    //Settiamo il mesurement nella quale scrivere i nostri dati su influx
     let measurement = 'measurements'
 
+    //Creaiamo il punto con tutti i valori necessari
     let point = new Point(measurement)
         .tag('id', id)
         .tag('gps', message.lt + "," + message.ln)
@@ -123,46 +127,52 @@ async function pointCreation(message, protocol) {
         .floatField('wifi_signal', parseFloat(message.w).toFixed(2))
         .floatField('tempOpenWeather', tempOpenWeather)
 
-    //Se è presente il delay del messaggio allora andiamo a ssalvarlo su firestore
+    //Se è presente il delay del messaggio allora andiamo a salvarlo su firestore
     if (message.delayMess !== undefined && message.delayMess !== 0) {
         await sendDelays(message.i, message.delayMess, protocol)
     }
-
+    //Scriviamo il punto su influx
     writeClient.writePoint(point)
 }
 
+//Comincia il forecast per tutte le misure e tutti e due gli algoritmi
 async function totalForecast(id, temp, hum, gas) {
+    //Forecast con algoritmo "time series forecasting"
     tempForecast(id, "temperature", temp)
     tempForecast(id, "humidity", hum)
     tempForecast(id, "gas", gas)
 
+    /* Per eseguire il forecasst con FBProphet ci serve la sample frequency dello specifico esp. Questo per prendere 
+    * il valore corrispondente forecastato. */
     let devices = await db.collection("device").get()
-
-    let sf = 1000
-
+    let sf = 1000       //Sample frequency
     devices.forEach((result) => {
         if (result.id === id)
             sf = result.data().sample_frequency
     })
 
+    //Facciamo il forecast con FBProphet per tutti i field
     trainModelFBProphet(id, "temperature", temp, sf)
     trainModelFBProphet(id, "humidity", hum, sf)
     trainModelFBProphet(id, "gas", gas, sf)
 }
 
+//Funzione generale per scrivere un punto forecastato. Prende in input che algoritmo è stato usato
 function writeForecastPoint(id, field, value, forecast, algorithm) {
     let point = new Point(measurementForecast)
         .tag('id', id)
         .tag('algorithm', algorithm)
-        .floatField('forecast_' + field, forecast.toFixed(2))
-        .floatField(field, value)
+        .floatField('forecast_' + field, forecast.toFixed(2))           //Valore forecastato
+        .floatField(field, value)                                                       //Valore reale
 
     writeClient.writePoint(point)
 }
 
+//Forecast per "Time series forecasting"
 async function tempForecast(id, field, value) {
-
-    let query = `from(bucket: "iotProject2022")|> range(start: -12h)
+    //Prendiamo i valori da considerare per effettuare il forecast
+    let query = `from(bucket: "iotProject2022")
+        |> range(start: -24h)
         |> filter(fn: (r) => r["_measurement"] == "measurements")
         |> filter(fn: (r) => r["id"] == "${id}")
         |> filter(fn: (r) => r["_field"] == "${field}")`
@@ -178,73 +188,74 @@ async function tempForecast(id, field, value) {
             console.error("Errore!", error)
         },
         complete: () => {
-            let nd = data.map(t => [t._time,
-                t._value])
+            let dataFormatted = data.map(t => [t._time, t._value]) //Mappiamo i valori come timeseries e valore (richiesto dalla libreria del forecast)
 
-            let forecast = timeseriesForecasting(nd)
+            //Eseguiamo il forecast vero e proprio
+            let forecast = timeseriesForecasting(dataFormatted)
 
+            //Scriviamo il punto forecastato
             writeForecastPoint(id, field, value, forecast, 'TimeSeriesAnalysis')
         }
     })
 
 }
 
+//Eseguiamo il forecast vero e proprio con la libreria "Time series forecasting"
 function timeseriesForecasting(data) {
-    // Load the data
-
+    //Prendiamo solo gli ultimi dati che ci interessano per creare la timeseries sulla quale effettuare il forecasting
     let t = new timeseries.main(data.slice(data.length - 1 - sampleDim, data.length));
+    //Calcoliamo i coefficienti
     let coeffs = t.ARMaxEntropy({degree: degree})
-    let forecast = 0;	// Init the value at 0.
-    for (let i = 0; i < coeffs.length; i++) {	// Loop through the coefficients
+    let forecast = 0;
+    //Ciclo for che trova il valore predetto
+    for (let i = 0; i < coeffs.length; i++) {   //Scorriamo i coefficienti ed effettuiamo le operazioni necessarie per predirre il valore
         forecast -= (t.data[t.data.length - 1 - i][1]) * coeffs[i];
-        // Explanation for that line:
-        // t.data contains the current dataset, which is in the format [ [date, value], [date,value], ... ]
-        // For each coefficient, we substract from "forecast" the value of the "N - x" datapoint's value, multiplicated by the coefficient, where N is the last known datapoint value, and x is the coefficient's index.
     }
     return forecast
 }
 
+//Effettuiamo il training per trovare il modello FBProphet
 async function trainModelFBProphet(esp, field, value, sf) {
-
+    //Path del file nella quale salvare il modello
     let pathModel = `./prophetForecasting/models/${esp}_${field}_model.json`
 
+    //Eseguiamo lo script per effettuare il training, gli passiamo l'id dell'esp, il field, e il path del file nella quale salvare il modello
     await exec(`conda run -n ${environmentName} python ${pythonScriptTrain} ${esp} ${field} ${pathModel}`, (error, stdout, stderr) => {
         if (error) {
             console.log(`error: ${error.message}`);
-            return;
-        }
-        if (stderr) {
-            console.log(`stderr: ${stderr}`);
         }
     })
 
-    let flag = fs.existsSync(pathModel)
+    //Controlliamo se il file sia presente
+    let flagModelloEsistente = fs.existsSync(pathModel)
 
-    while (!flag) {
+    //Stiamo in attesa che venga creato il file contenente il modello
+    while (!flagModelloEsistente) {
+        //Ogni 2 secondi controlliamo se è stato creato
         await new Promise(r => setTimeout(r, 2000));
-        flag = fs.existsSync(pathModel)
+        flagModelloEsistente = fs.existsSync(pathModel)
     }
 
-    console.log("trainig completato!")
+    console.log("Trainig completato per il field -> " + field)
 
+    //Avvia il forecasting vero e proprio
     forecastFBProphet(esp, field, value, sf)
-
 }
 
+//Effettua il forecast vero e proprio con FBProphet
 function forecastFBProphet(esp, field, value, sf) {
-
+    //Path dalla quale prendere il modello
     let pathModel = `./prophetForecasting/models/${esp}_${field}_model.json`
 
+    //Eseguiamo lo script che effettua il forecast
     exec(`conda run -n ${environmentName} python ${pythonScriptForecast} ${sf} ${pathModel}`, (error, stdout, stderr) => {
         if (error) {
             console.log(`error: ${error.message}`);
             return;
         }
-        if (stderr) {
-            //console.log(`stderr: ${stderr}`);
-            //return;
-        }
+        //Prendiamo il valore forecastato dal terminale
         let forecast = parseFloat(stdout)
+        //Scriviamo il punto forecastato su influx
         writeForecastPoint(esp, field, value, forecast, "FBProphet")
     })
 }

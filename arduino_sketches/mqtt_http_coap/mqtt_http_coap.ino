@@ -5,51 +5,50 @@
 #include <coap-simple.h>
 #include "DHT.h"
 
-//Costanti
+//Costanti per identificare il protocollo tramite intero
 #define MQTT 0
 #define HTTP 1
 #define COAP 2
-#define UNDEFINED 3
+#define UNDEFINED 3     //Usato quando l'esp non è ancora inizializzato
 #define DHTPIN 21
 #define DHTTYPE DHT11   // DHT 11
-#define MAXDELAYINIT 19000  //Delay prima di fare una nuova richiesta di inizializzazione +1000 generale
+#define MAX_DELAY_INIT 19000  //Delay prima di fare una nuova richiesta di inizializzazione +1000 generale
 
 // WiFi
-const char *ssid = "Vodafone-C02090047"; // Enter your WiFi name
-const char *password = "ERxFJfcyc3rtpY3H";  // Enter WiFi password
+const char *ssid = "Vodafone-C02090047";        // WiFi name
+const char *password = "ERxFJfcyc3rtpY3H";      // WiFi password
 
 //HTTP
-//Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.1.7:3000/sensordata";
+String serverName = "http://192.168.1.7:3000/sensordata";   //URL per inviare dati con HTTP
 HTTPClient http;
-//HTTP to initialize esp
-String serverInit = "http://192.168.1.7:3000/initialize";
+String serverInit = "http://192.168.1.7:3000/initialize";   //URL per richiesta di inizializzazione dell'esp
 
-//Values
+//Variables
+//Position (Hardcoded)
 const float lat = 44.4945441;
 const float lon = 11.3440067;
-String client_id = "esp32_caio";
-const int n_measure_aqi = 5;
-int current_measure = 0;
-int protocol = MQTT;
-float MAX_GAS_VALUE = 0;
-float MIN_GAS_VALUE = 0;
-int SAMPLE_FREQUENCY = 1000;
-float arrGas[n_measure_aqi] = {};
-bool inizializzato = false;
-bool connectionOk = false;
-int countDelayInit = 0;
+String client_id = "esp32_caio";    //Client ID (Hardcoded)
+const int n_measure_aqi = 5;        //Quante misure del gas prendere per calcolare aqi
+int current_measure = 0;            //Misura corrente per calcolo aqi
+int protocol = MQTT;                //Protocollo di default
+float MAX_GAS_VALUE = 0;            //MAX_GAS di default
+float MIN_GAS_VALUE = 0;            //MIN_GAS di default
+int SAMPLE_FREQUENCY = 1000;        //SAMPLE_FREQUENCY di default
+float arrGas[n_measure_aqi] = {};   //Array dove vengono salvati tutti i valori del gas (per calcolo aqi)
+bool inizializzato = false;         //Flag per verificare che l'esp sia inizializzato
+int countDelayInit = 0;             //Count utile per capire quando effettuare la nuova richiesta di inizializzazione
 String initString = "Sto facendo la richiesta di inizializzazione...";
+float tempoInizDelay = 0;           //Variabile che prenderà sempre i millisecondi iniziali, utile per il calcolo del delay HTTP
 
 
 //MQTT
-const char *mqtt_broker = "broker.emqx.io";
-const char *topic = "sensor/values";
-const char *topicDelay = "delay";
-const char *topicReceive = String("device/parameters/" + client_id).c_str();
+const char *mqtt_broker = "broker.emqx.io";     //Broker MQTT pubblico
 const char *mqtt_username = "emqx";
 const char *mqtt_password = "public";
 const int mqtt_port = 1883;
+const char *topic = "sensor/values";            //Topic per inviare i dati dei sensori
+const char *topicDelay = "delay";               //Topic per inviare il delay della richiesta HTTP dopo che viene calcolato
+const char *topicReceive = String("device/parameters/" + client_id).c_str();    //Topic per ricevere i parametri dell'esp dal server
 
 //CoAP
 WiFiUDP udp;
@@ -70,8 +69,6 @@ DHT dht(DHTPIN, DHTTYPE);
 //MQ-2
 int greenLed = 13;
 int smokeA0 = A5;
-//Threshold gas
-int sensorThres = 130;
 
 //Inizializzazione connessione wifi
 void initWiFi() {
@@ -87,38 +84,38 @@ void initWiFi() {
 
 //Inizializzazione connessione MQTT
 void initMQTT() {
-  //connecting to a mqtt broker
+  //Connessione al broker MQTT
   client.setServer(mqtt_broker, mqtt_port);
   client.setCallback(callback);
+  //Finchè non si connette continuiamo a provarci
   while (!client.connected()) {
     //client_id += String(WiFi.macAddress());
     Serial.printf("The client %s connects to the public mqtt broker\n", client_id.c_str());
     if (client.connect(client_id.c_str())) {
       Serial.println("Public emqx mqtt broker connected");
     } else {
-      Serial.print("failed with state ");
+      Serial.print("Failed with state ");
       Serial.print(client.state());
       delay(2000);
     }
   }
-  // publish and subscribe
+  //Ci sottoscriviamo al topic per ricevere i parametri di inizializzazione (o di cambio parametri)
   client.subscribe(topicReceive);
 }
 
-//Inizializzazione connessione http
+//Inizializzazione connessione HTTP
 void initHTTP(String server) {
-  // Your Domain name with URL path or IP address with path
   http.begin(server);
   http.addHeader("Content-Type", "application/json");
 }
 
-//Inizializzazione connessione coap
+//Inizializzazione connessione COAP
 void initCoAP() {
   coap.server(callback_sensordata, "sensordata");
   coap.start();
 }
 
-//Funzione per ricevere messaggi dal server
+//Funzione per ricevere messaggi dal server tramite MQTT
 void callback(char *topic, byte *payload, unsigned int length) {
   String message = "";
   Serial.println();
@@ -127,29 +124,33 @@ void callback(char *topic, byte *payload, unsigned int length) {
     message.concat(String((char) payload[i]));
   }
 
-  // Deserialize the JSON document
+  //Quando riceviamo il messaggio dei parametri dobbiamo interpretare il JSON
   DeserializationError error = deserializeJson(doc, message);
 
-  // Test if parsing succeeds.
+  //Controlliamo che il parsing dei dati JSON sia andato a buon fine
   if (error) {
     Serial.print(F("deserializeJson() failed: "));
     Serial.println(error.f_str());
     Serial.println("I can't set the new parameters, JSON error!");
   } else {
-    // Se il messaggio arrivato è correttamente formattato
+    // Se il messaggio arrivato è correttamente formattato prendiamo i dati che ci servono da esso
     protocol = doc["protocol"];
     MAX_GAS_VALUE = doc["max_gas_value"];
     MIN_GAS_VALUE = doc["min_gas_value"];
+    //Se il protocollo non è COAP dobbiamo settare la SAMPLE_FREQUENCY altrimenti i tempi saranno dettati dal server
     if (protocol != COAP)
       SAMPLE_FREQUENCY = doc["sample_frequency"];
     else
       SAMPLE_FREQUENCY = 1000;
 
+    //Stampa dei dati ricevuti
     Serial.println("Protocol:" + String(protocol));
     Serial.println("MAX_GAS_VALUE:" + String(MAX_GAS_VALUE));
     Serial.println("MIN_GAS_VALUE:" + String(MIN_GAS_VALUE));
     Serial.println("SAMPLE_FREQUENCY:" + String(SAMPLE_FREQUENCY));
     Serial.println();
+
+    //In caso il protocollo non sia stato definito continuiamo a richiedere l'inizializzazione
     if (protocol != UNDEFINED) {
       inizializzato = true;
     } else {
@@ -214,6 +215,7 @@ boolean stampaErroriHTTP(int httpResponseCode) {
     ok = false;
   }
   Serial.println(httpResponseCode);
+  //Se stiamo chiedendo l'inizializzazione di un device non presente su firestore il server ci restituirà il codice 501
   if (httpResponseCode == 501) {
     Serial.println("Nessun dispositivo registrato con questo id!");
     ok = false;
@@ -221,38 +223,36 @@ boolean stampaErroriHTTP(int httpResponseCode) {
   return ok;
 }
 
-// CoAP server endpoint URL
+//Callback COAP, chiamata quando deve inviare un messaggio tramite il protocollo COAP
 void callback_sensordata(CoapPacket &packet, IPAddress ip, int port) {
-  const char *messaggio = calcoloValori().c_str();
+  const char *messaggio = calcoloValori().c_str();      //Prendiamo i valori dai sensori e restituiamo il messaggio da inviare
+  //Invio della risposta COAP
   coap.sendResponse(ip, port, packet.messageid, messaggio,
                     strlen(messaggio), COAP_CONTENT, COAP_APPLICATION_JSON,
                     packet.token, packet.tokenlen);
 }
 
-//Prendiamo i valori dai sensori e calcoliamo la qualità dell'aria
+//Prendiamo i valori dai sensori e calcoliamo la qualità dell'aria, inoltre creaimo il messaggio da inviare
 String calcoloValori() {
   //DHT11
-  //Read humidity
-  float h = dht.readHumidity();
-  // Read temperature as Celsius
-  float t = dht.readTemperature();
+  float h = dht.readHumidity();         //Leggiamo l'umidità
+  float t = dht.readTemperature();      //Leggiamo la temperatura
 
   //MQ-2
-  int g = analogRead(smokeA0);
+  int g = analogRead(smokeA0);          //Leggiamo il valore del gas
 
-  // Check if any reads failed and exit early (to try again).
+  //Controlliamo che non ci siano stati errori nella lettura dei valori dei sensori
   if (isnan(h) || isnan(t) || isnan(g)) {
     Serial.println(F("Failed to read from sensors!"));
     return "Errore";
   } else {
-    arrGas[current_measure % n_measure_aqi] = g;
-    int aqi = 2;
-    float wifi_signal = WiFi.RSSI();
-
-    aqi = calcoloAQI(MAX_GAS_VALUE, MIN_GAS_VALUE, arrGas, &current_measure);
-
-    String msg = creaMessaggio(t, h, g, aqi, wifi_signal);
-    Serial.println(client_id + " - Protocollo: " + protocol + " --> " + msg);
+    //Se la lettura dei sensori è andata a buon fine dobbiamo calcolare prima di tutto l'aqi
+    arrGas[current_measure % n_measure_aqi] = g;                                //Moving Average Window
+    int aqi = 2;                                                                    //Inizializziamo l'aqi a 2
+    aqi = calcoloAQI(MAX_GAS_VALUE, MIN_GAS_VALUE, arrGas, &current_measure);   //Calcolo aqi
+    float wifi_signal = WiFi.RSSI();                                            //Misuriamo anche l'RSSI del WiFi
+    String msg = creaMessaggio(t, h, g, aqi, wifi_signal);                      //Creazione del messaggio
+    Serial.println(client_id + " - Protocollo: " + protocol + " --> " + msg);   //Stampiamo per vedere se il messaggio è corretto
     return msg;
   }
 }
@@ -260,29 +260,29 @@ String calcoloValori() {
 /* Mandiamo il messaggio al server per inizializzare i parametri dell'esp, tramite l'id il server ci riconoscerà e ci invierà
   i dati corretti per il nostro esp. */
 void initParameters() {
+  //Oltre l'id, inviamo al server anche l'ip (Per future richieste COAP) e la latitudine e la longitudine (Per prima richiesta OpenWeatherMap)
   String messaggioInit = String("{\"id\": \"" + client_id + "\", \"ip\": \"" + WiFi.localIP().toString() + "\", \"lt\":" + String(lat, 7) + ", \"ln\": " + String(lon, 7) + "}");
-  initHTTP(serverInit);
-  // Send HTTP POST request
-  int httpResponseCode = http.POST(messaggioInit);
-  // Free resources
+  initHTTP(serverInit);                             //Per settare il nuovo URL alla quale fare richiesta di inizializzazione
+  int httpResponseCode = http.POST(messaggioInit);  //Mandiamo la richiesta
   http.end();
 }
 
+//Controlliamoche l'esp sia stato inizializzato prima di procedere nel prendere i dati dai sensori
 void checkInitRequest() {
   //Se il contatore è a zero, effettuiamo una richiesta per i parametri
   if (countDelayInit == 0) {
-    initParameters();
-    countDelayInit = countDelayInit + SAMPLE_FREQUENCY;
+    initParameters();                                       //Richiesta dei parametri
+    countDelayInit = countDelayInit + SAMPLE_FREQUENCY;     //Incrementiamo il contatore per la richiesta di inizializzazione
   }//Se non è zero, aspettiamo tot secondi, se raggiungiamo la soglia dei venti ne facciamo un'altra
   else {
-    if (countDelayInit == MAXDELAYINIT) {
+    if (countDelayInit == MAX_DELAY_INIT) {
       Serial.println();
       Serial.println("Nessuna risposta. Faccio una nuova richiesta!");
       initString = "Sto facendo la richiesta di inizializzazione...";
       countDelayInit = 0;
     }
     else {
-      countDelayInit = countDelayInit + SAMPLE_FREQUENCY;
+      countDelayInit = countDelayInit + SAMPLE_FREQUENCY;   //Incrementiamo il contatore per la richiesta di inizializzazione
     }
   }
 }
@@ -292,6 +292,7 @@ void setup() {
   // Set software serial baud to 115200;
   Serial.begin(115200);
 
+  //Inizializziamo tutto
   initWiFi();
   initMQTT();
   initHTTP(serverName);
@@ -307,33 +308,31 @@ void setup() {
 
 //LOOP
 void loop() {
-  float tempoInizDelay = 0;
+  //Se è connesso ed inizilizzato possiamo procedere
   if (WiFi.status() == WL_CONNECTED) {
     if (!inizializzato) {
+      //Se non è inizilizzato continuiamo a chiedere l'inizializzazione
       Serial.print(initString);
       initString = ".";
       checkInitRequest();
     } else {
-      String messaggio;
-
+      String messaggio;                   //Variabile che prenderà sempre il messaggio da inviare al server
       if (protocol == MQTT || protocol == HTTP) {
-        messaggio = calcoloValori();
+        messaggio = calcoloValori();      //COAP non compreso perchè il calcolo dei valori verrà fatto solamente quando necessario
       }
 
       if (protocol == MQTT) {
-        client.publish(topic, messaggio.c_str());
+        client.publish(topic, messaggio.c_str());   //Se sta usando MQTT allora pubblichiamo al topic dedicato
       } else if (protocol == HTTP) {
-
-        initHTTP(serverName);
-        // Send HTTP POST request
-        tempoInizDelay = millis();
-        int httpResponseCode = http.POST(messaggio);
-        float delay = tempoInizDelay - millis();
-        bool ok = stampaErroriHTTP(httpResponseCode);
-        if(ok){
-           client.publish(topicDelay, String("{\"id\": \"" + client_id +"\" , \"delay\": " + String(delay) + ", \"protocol\": \"HTTP\" }").c_str());
+        initHTTP(serverName);                               //Se invece sta usando HTTP inizializziamo il tutto per l'URL dedicato
+        tempoInizDelay = millis();                          //Prendiamo i millisecondi per poi caloclare il delay
+        int httpResponseCode = http.POST(messaggio);        //Facciamo la richiesta
+        float delay = tempoInizDelay - millis();            //Calcoliamo il delay
+        bool ok = stampaErroriHTTP(httpResponseCode);       //Controlliamo che la richiesta sia andata a buon fine
+        //Se è andata buon fine inviamo il delay al server
+        if (ok) {
+          client.publish(topicDelay, String("{\"id\": \"" + client_id + "\" , \"delay\": " + String(delay) + ", \"protocol\": \"HTTP\" }").c_str());
         }
-        // Free resources
         http.end();
       }
     }
@@ -342,6 +341,5 @@ void loop() {
   }
   client.loop();
   coap.loop();
-  //Serial.println("--------------------");
   delay(SAMPLE_FREQUENCY);
 }
