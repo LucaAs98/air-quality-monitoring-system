@@ -19,6 +19,7 @@ const clientMQTT = mqtt.connect(connectUrl, {
 })
 const topic1 = "sensor/values"      //Topic per la ricezione dei valori dell'esp
 const topic2 = "delay"              //Topic per la ricezione del delay calcolato sull'esp
+const topic3 = "acknowledgement/"    //Topic perinviare l'ack all'esp quando invia messaggi MQTT
 const topics = [topic1, topic2]
 
 //INFLUXDB
@@ -53,6 +54,7 @@ let mapForecasting = new Map()                                                  
 let admin = require("firebase-admin");
 let db = admin.firestore();
 
+
 /** MQTT **/
 //Quando riceve un messaggio MQTT
 clientMQTT.on('message', async (topic, payload) => {
@@ -60,11 +62,15 @@ clientMQTT.on('message', async (topic, payload) => {
         //Abbiamo ricevuto un messaggio tramite MQTT al primo topic
         if (payload.toString() !== "Errore") {
             let message = JSON.parse(payload.toString())
+            //Mandiamo l'ack per calcolare il delay del messaggio MQTT
+            sendAcknowledgementForDelay(message.i)
             console.log('MQTT ' + message.i + ' -> ' + JSON.stringify(message))
             await pointCreation(message, "MQTT")
         } else {
             console.log("Non sono riuscito a leggere i dati dai sensori!")
         }
+
+
     } else {
         //Dobbiamo inviare il nuovo delay a firebase, secondo topic
         if (payload.toString() !== "Errore") {
@@ -83,6 +89,20 @@ clientMQTT.on('connect', () => {
         console.log(`Subscribe to topics '${topics}'`)
     })
 })
+
+//Mandiamo l'acknoledgment all'esp per sapere quanto è stato il delay
+function sendAcknowledgementForDelay(id){
+    clientMQTT.publish(topic3 + id, "{ack: \'ok\'}", {
+        qos: 0,
+        retain: false
+    }, (error) => {
+        if (error) {
+            console.error(error)
+        } else {
+            console.log("Ack MQTT inviato all'esp -> " + id)
+        }
+    })
+}
 
 //Funzione chiamata da web_page quando viene cambiato il valore dello switch
 function changeForecastFlag(flag) {

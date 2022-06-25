@@ -39,16 +39,19 @@ bool inizializzato = false;         //Flag per verificare che l'esp sia iniziali
 int countDelayInit = 0;             //Count utile per capire quando effettuare la nuova richiesta di inizializzazione
 String initString = "Sto facendo la richiesta di inizializzazione...";
 float tempoInizDelay = 0;           //Variabile che prenderà sempre i millisecondi iniziali, utile per il calcolo del delay HTTP
-
+float delayMessage = 0;
 
 //MQTT
 const char *mqtt_broker = "broker.emqx.io";     //Broker MQTT pubblico
 const char *mqtt_username = "emqx";
 const char *mqtt_password = "public";
 const int mqtt_port = 1883;
-const char *topic = "sensor/values";            //Topic per inviare i dati dei sensori
-const char *topicDelay = "delay";               //Topic per inviare il delay della richiesta HTTP dopo che viene calcolato
-const char *topicReceive = String("device/parameters/" + client_id).c_str();    //Topic per ricevere i parametri dell'esp dal server
+const char *topic = "sensor/values";                          //Topic per inviare i dati dei sensori
+const char *topicDelay = "delay";                             //Topic per inviare il delay della richiesta HTTP dopo che viene calcolato
+String topicReceive = String("device/parameters/" + client_id);    //Topic per ricevere i parametri dell'esp dal server
+String topicAck = String("acknowledgement/" + client_id);        //Topic per ricevere l'ack quando invia un messaggio MQTT
+
+bool flagAck = false;
 
 //CoAP
 WiFiUDP udp;
@@ -99,8 +102,11 @@ void initMQTT() {
       delay(2000);
     }
   }
+  
   //Ci sottoscriviamo al topic per ricevere i parametri di inizializzazione (o di cambio parametri)
-  client.subscribe(topicReceive);
+  client.subscribe(topicReceive.c_str());
+  //Ci sottoscriviamo al topic per ricevere gli ack dei messaggi MQTT
+  client.subscribe(topicAck.c_str());
 }
 
 //Inizializzazione connessione HTTP
@@ -118,8 +124,6 @@ void initCoAP() {
 //Funzione per ricevere messaggi dal server tramite MQTT
 void callback(char *topic, byte *payload, unsigned int length) {
   String message = "";
-  Serial.println();
-  Serial.print("Message:");
   for (int i = 0; i < length; i++) {
     message.concat(String((char) payload[i]));
   }
@@ -133,30 +137,36 @@ void callback(char *topic, byte *payload, unsigned int length) {
     Serial.println(error.f_str());
     Serial.println("I can't set the new parameters, JSON error!");
   } else {
-    // Se il messaggio arrivato è correttamente formattato prendiamo i dati che ci servono da esso
-    protocol = doc["protocol"];
-    MAX_GAS_VALUE = doc["max_gas_value"];
-    MIN_GAS_VALUE = doc["min_gas_value"];
-    //Se il protocollo non è COAP dobbiamo settare la SAMPLE_FREQUENCY altrimenti i tempi saranno dettati dal server
-    if (protocol != COAP)
-      SAMPLE_FREQUENCY = doc["sample_frequency"];
-    else
-      SAMPLE_FREQUENCY = 1000;
+    if (String(topic).equals(topicReceive)) {
+      // Se il messaggio arrivato è correttamente formattato prendiamo i dati che ci servono da esso
+      protocol = doc["protocol"];
+      MAX_GAS_VALUE = doc["max_gas_value"];
+      MIN_GAS_VALUE = doc["min_gas_value"];
+      //Se il protocollo non è COAP dobbiamo settare la SAMPLE_FREQUENCY altrimenti i tempi saranno dettati dal server
+      if (protocol != COAP)
+        SAMPLE_FREQUENCY = doc["sample_frequency"];
+      else
+        SAMPLE_FREQUENCY = 1000;
 
-    //Stampa dei dati ricevuti
-    Serial.println("Protocol:" + String(protocol));
-    Serial.println("MAX_GAS_VALUE:" + String(MAX_GAS_VALUE));
-    Serial.println("MIN_GAS_VALUE:" + String(MIN_GAS_VALUE));
-    Serial.println("SAMPLE_FREQUENCY:" + String(SAMPLE_FREQUENCY));
-    Serial.println();
+      //Stampa dei dati ricevuti
+      Serial.println();
+      Serial.println("Protocol:" + String(protocol));
+      Serial.println("MAX_GAS_VALUE:" + String(MAX_GAS_VALUE));
+      Serial.println("MIN_GAS_VALUE:" + String(MIN_GAS_VALUE));
+      Serial.println("SAMPLE_FREQUENCY:" + String(SAMPLE_FREQUENCY));
+      Serial.println();
 
-    //In caso il protocollo non sia stato definito continuiamo a richiedere l'inizializzazione
-    if (protocol != UNDEFINED) {
-      inizializzato = true;
+      //In caso il protocollo non sia stato definito continuiamo a richiedere l'inizializzazione
+      if (protocol != UNDEFINED) {
+        inizializzato = true;
+      } else {
+        inizializzato = false;
+        countDelayInit = 0;
+        initString = "Sto facendo la richiesta di inizializzazione...";
+      }
     } else {
-      inizializzato = false;
-      countDelayInit = 0;
-      initString = "Sto facendo la richiesta di inizializzazione...";
+      delayMessage = tempoInizDelay - millis();            //Calcoliamo il delay
+      flagAck = true;
     }
   }
 }
@@ -322,16 +332,22 @@ void loop() {
       }
 
       if (protocol == MQTT) {
+        tempoInizDelay = millis();
         client.publish(topic, messaggio.c_str());   //Se sta usando MQTT allora pubblichiamo al topic dedicato
+        while (!flagAck) {
+          client.loop();
+        }
+        client.publish(topicDelay, String("{\"id\": \"" + client_id + "\" , \"delay\": " + String(delayMessage) + ", \"protocol\": \"MQTT\" }").c_str());
+        flagAck = false;
       } else if (protocol == HTTP) {
         initHTTP(serverName);                               //Se invece sta usando HTTP inizializziamo il tutto per l'URL dedicato
         tempoInizDelay = millis();                          //Prendiamo i millisecondi per poi caloclare il delay
         int httpResponseCode = http.POST(messaggio);        //Facciamo la richiesta
-        float delay = tempoInizDelay - millis();            //Calcoliamo il delay
+        delayMessage = tempoInizDelay - millis();                  //Calcoliamo il delay
         bool ok = stampaErroriHTTP(httpResponseCode);       //Controlliamo che la richiesta sia andata a buon fine
         //Se è andata buon fine inviamo il delay al server
         if (ok) {
-          client.publish(topicDelay, String("{\"id\": \"" + client_id + "\" , \"delay\": " + String(delay) + ", \"protocol\": \"HTTP\" }").c_str());
+          client.publish(topicDelay, String("{\"id\": \"" + client_id + "\" , \"delay\": " + String(delayMessage) + ", \"protocol\": \"HTTP\" }").c_str());
         }
         http.end();
       }
