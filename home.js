@@ -22,6 +22,13 @@ $(`.dropdown-item`).on('click', function () {
     $(`#protocol_dropdown`).text(protocol)
 })
 
+//Quando attiviamo lo switch del forecasting andiamo a cambiare il booleano
+$('#switchForecasting').on('change', function() {
+    let isChecked = $(this).prop('checked')
+    $.post("/forecasting", {flag: isChecked});
+});
+
+
 /** MODAL **/
 //Setta il comportamento del modal che si apre quando aggiungiamo un device nella webpage.
 function setAddDeviceBehaviour() {

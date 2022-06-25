@@ -2,6 +2,8 @@ require('dotenv').config();
 let variables = process.env
 const axios = require("axios");
 const fs = require('fs')
+var express = require('express'),
+    router = express.Router();
 
 //Inizializza MQTT
 const mqtt = require('mqtt')
@@ -35,7 +37,7 @@ const tempoNuovoForecast = 120000 //Tempo dopo la quale effettuare un nuovo fore
 const timeseries = require("timeseries-analysis");
 const sampleDim = 78        //Contiene il numero di sample da considerare per effetuare il forecast
 const degree = 1            //Numero di coefficienti da calcolare
-
+let forecastFlag = false;
 
 //Forecasting FBProphet
 const {exec} = require("child_process");
@@ -82,6 +84,11 @@ clientMQTT.on('connect', () => {
     })
 })
 
+//Funzione chiamata da web_page quando viene cambiato il valore dello switch
+function changeForecastFlag(flag) {
+    forecastFlag = flag
+}
+
 //Funzione per creare il punto da salvare su influx
 async function pointCreation(message, protocol) {
     //Prepariamo i valori da salvare
@@ -90,16 +97,18 @@ async function pointCreation(message, protocol) {
     let hum = parseFloat(message.h).toFixed(2)
     let gas = parseFloat(message.g).toFixed(2)
 
-    //Se non ha alcun forecast si avvia altrimenti controlliamo se è il momento di farne un altro
-    if (!mapForecasting.has(id)) {
-        totalForecast(id, temp, hum, gas)
-        mapForecasting.set(id, new Date())
-    } else {
-        let d = new Date()
-        //Se è il momento di fare un nuovo forecast, lo avviamo
-        if ((d - mapForecasting.get(id)) > tempoNuovoForecast) {
+    //Se lo switch sulla home page è attivo allora viene effettuato altrimenti no
+    if (forecastFlag) {
+        if (!mapForecasting.has(id)) {
             totalForecast(id, temp, hum, gas)
-            mapForecasting.set(id, d)       //Settiamo il nuovo tempo di inizio dell'ultimo forecast
+            mapForecasting.set(id, new Date())
+        } else {
+            let d = new Date()
+            //Se è il momento di fare un nuovo forecast, lo avviamo
+            if ((d - mapForecasting.get(id)) > tempoNuovoForecast) {
+                totalForecast(id, temp, hum, gas)
+                mapForecasting.set(id, d)       //Settiamo il nuovo tempo di inizio dell'ultimo forecast
+            }
         }
     }
 
@@ -278,4 +287,4 @@ async function getDelays(id) {
     })
 }
 
-module.exports = {pointCreation}
+module.exports = {pointCreation, changeForecastFlag}

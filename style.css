@@ -116,3 +116,14 @@ input[type="range"]:active::-webkit-slider-thumb {
     alignment: center;
     width: 10%;
 }
+
+.form-switch {
+    margin-top: 10px;;
+}
+
+#labelForecasting {
+    color: white;
+    font-weight: bold;
+    margin-right: 100px;
+    margin-left: 8px;
+}

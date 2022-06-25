@@ -5,7 +5,7 @@ const express = require("express");
 const open = require('open');
 const app = express();
 const sendAlerts = require("./telegram/index")
-const {pointCreation} = require("./receiver")
+const {pointCreation, changeForecastFlag} = require("./receiver")
 const axios = require("axios");
 
 app.set('views', __dirname + '/');
@@ -165,11 +165,10 @@ app.post("/update_device", async (req, res) => {
     res.end();
 });
 
-//Quando premiamo il bottone del forecasting avviamo tutto il procedimento di esso
+//Quando cambiamo il valore dello switch del forecasting lo segnaliamo a "receiver" in modo tale che possa avviarlo o meno
 app.post("/forecasting", async (req, res) => {
-    //const id = req.body.id
-    let id = "esp32_caio"
-    //await trainModel(id)
+    const forecastFlag = req.body.flag
+    changeForecastFlag(forecastFlag)
     res.end();
 });
 
@@ -364,7 +363,7 @@ async function getDevices() {
             min_gas_value: resD.min_gas_value,
             sample_frequency: resD.sample_frequency,
             protocol: resD.protocol.trim(),
-            lat: 44.490931818740,       /******************** CONTROLLA *************/
+            lat: 44.490931818740, /******************** CONTROLLA *************/
             long: 11.35460682369,
             prima_richiesta: true
         }
