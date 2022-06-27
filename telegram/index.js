@@ -554,25 +554,16 @@ async function setEsp(chatId, msg) {
     if (!activeUsers.has(chatId)) {
         //Se l'utente non ha ancora selezionato alcuna board eseguiamo i seguenti comandi
         let textMsg = msg.text.trim()                  //Esp selezionato da tastiera
-        let iteratorDevices = devices.keys()
-        let result = true
-        let valueIt
-        //Controlliamo che esista l'esp selezionato dall'utente e settiamo tutto nel db
-        do {
-            valueIt = iteratorDevices.next()
-            if (!valueIt.done) {
-                if (textMsg === valueIt.value) {
-                    let jsonData = {
-                        scheda: textMsg,
-                        report: null
-                    }
-                    activeUsers.set(chatId, jsonData)
-                    result = false
-                }
-            } else {
-                result = false
+
+        //Verifichiamo che l'esp selezionato sia esistente
+        if(devices.has(textMsg)){
+            let jsonData = {
+                scheda: textMsg,
+                report: null
             }
-        } while (result)
+            activeUsers.set(chatId, jsonData)
+        }
+
         if (!activeUsers.has(chatId)) {
             bot.sendMessage(chatId, "Selected device doesn't exists!")
         } else {
@@ -590,26 +581,17 @@ async function changeEsp(chatId, msg) {
     //Simile al set, ma in questo caso aggiorniamo e basta
     if (activeUsers.has(chatId)) {
         let textMsg = msg.text.trim()
-        let iteratorDevices = devices.keys()
         let flagInterno = false
-        let result = true
-        let valueIt
-        do {
-            valueIt = iteratorDevices.next()
-            if (!valueIt.done) {
-                if (textMsg === valueIt.value) {
-                    let jsonData = {
-                        scheda: textMsg,
-                        report: null
-                    }
-                    activeUsers.set(chatId, jsonData)
-                    result = false
-                    flagInterno = true
-                }
-            } else {
-                result = false
+
+        //Verifichiamo che l'esp selezionato sia esistente
+        if(devices.has(textMsg)){
+            let jsonData = {
+                scheda: textMsg,
+                report: null
             }
-        } while (result)
+            activeUsers.set(chatId, jsonData)
+            flagInterno = true
+        }
 
         if (!flagInterno) {
             bot.sendMessage(chatId, "Input Error!")
