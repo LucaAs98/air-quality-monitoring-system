@@ -5,7 +5,7 @@ const express = require("express");
 const open = require('open');
 const app = express();
 const sendAlerts = require("./telegram/index")
-const {pointCreation, changeForecastFlag} = require("./receiver")
+const {pointCreation, changeSwitchFlag} = require("./receiver")
 const axios = require("axios");
 
 app.set('views', __dirname + '/');
@@ -15,11 +15,6 @@ app.set('view engine', 'ejs');
 app.use(express.urlencoded());
 app.use(express.static(__dirname));
 app.use(express.json());
-
-/* Stiamo in ascolto su "localhost:3000". */
-app.listen(3000, () => {
-    console.log("Application started and Listening on port 3000");
-});
 
 /** Inizializzazione FIREBASE **/
 let admin = require("firebase-admin");
@@ -56,6 +51,15 @@ let mapJobs = new Map()     //Mappa lista dei job attivi
 
 //Contiene gli esp presenti su firebase
 let arrayESP32 = [];
+
+//Flag delay da segnalare all'esp
+let delayFlag = 0;
+let forecastFlag = false;
+
+/* Stiamo in ascolto su "localhost:3000". */
+app.listen(3000, () => {
+    console.log("Application started and Listening on port 3000");
+});
 
 /*** Richieste GET ***/
 /* Ad URL "/home" rendirizziamo "home.html". Questo a sua volta chiamerà lo script "home.js". */
@@ -104,6 +108,10 @@ app.get("/get_influx_data", async (req, res) => {
     })
 });
 
+/* Ad URL "/get_flags_values" inviamo alla home i valori degli switch delay e forecast. */
+app.get("/get_flags_values", async (req, res) => {
+    res.json({delay: delayFlag, forecast: forecastFlag});     //Se tutto va bene li restituiamo
+});
 /*** Richieste POST **/
 
 //A richiesta post della home renidirizziamo l'html
@@ -167,8 +175,32 @@ app.post("/update_device", async (req, res) => {
 
 //Quando cambiamo il valore dello switch del forecasting lo segnaliamo a "receiver" in modo tale che possa avviarlo o meno
 app.post("/forecasting", async (req, res) => {
-    const forecastFlag = req.body.flag
-    changeForecastFlag(forecastFlag)
+    forecastFlag = req.body.flag
+    changeSwitchFlag(forecastFlag, "forecast")
+    res.end();
+});
+
+//Quando cambiamo il valore dello switch del delay lo segnaliamo a "receiver" in modo tale che possa inviarli o meno
+app.post("/delay", async (req, res) => {
+    if (req.body.flag === "true") {
+        delayFlag = 1
+    } else {
+        delayFlag = 0
+    }
+
+    changeSwitchFlag(req.body.flag, "delay")
+    arrayESP32.forEach(obj => {
+        //Segnaliamo all'esp che è stato attivato il delay
+        let parameters = {
+            id: obj.id,
+            max_gas_value: obj.max_gas_value,
+            min_gas_value: obj.min_gas_value,
+            sample_frequency: obj.sample_frequency,
+            protocol: obj.protocol.trim(),
+        }
+        //Inviamo i suoi stessi parametri, ma con il flag cambiato
+        sendNewParameters(parameters)
+    })
     res.end();
 });
 
@@ -389,7 +421,8 @@ function createMessage(protocol, sample_frequency, max_gas_value, min_gas_value)
     return '{ \"protocol\": \"' + getProtocol(protocol) + '\",' +
         '\"sample_frequency\":' + sample_frequency + ',' +
         '\"max_gas_value\":' + max_gas_value + ',' +
-        '\"min_gas_value\":' + min_gas_value + '}'
+        '\"min_gas_value\":' + min_gas_value + ',' +
+        '\"delayFlag\":' + delayFlag + '}'
 }
 
 /* Funzione che dato il protocollo in stringa restituisce il suo numero corrispondente. Abbiamo fatto questo per prenderlo

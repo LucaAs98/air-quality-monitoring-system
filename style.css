@@ -121,7 +121,7 @@ input[type="range"]:active::-webkit-slider-thumb {
     margin-top: 10px;;
 }
 
-#labelForecasting {
+#labelForecasting, #labelDelay {
     color: white;
     font-weight: bold;
     margin-right: 100px;

@@ -40,6 +40,7 @@ int countDelayInit = 0;             //Count utile per capire quando effettuare l
 String initString = "Sto facendo la richiesta di inizializzazione...";
 float tempoInizDelay = 0;           //Variabile che prenderà sempre i millisecondi iniziali, utile per il calcolo del delay HTTP
 float delayMessage = 0;
+bool delayFlag = false;
 
 //MQTT
 const char *mqtt_broker = "broker.emqx.io";     //Broker MQTT pubblico
@@ -102,7 +103,7 @@ void initMQTT() {
       delay(2000);
     }
   }
-  
+
   //Ci sottoscriviamo al topic per ricevere i parametri di inizializzazione (o di cambio parametri)
   client.subscribe(topicReceive.c_str());
   //Ci sottoscriviamo al topic per ricevere gli ack dei messaggi MQTT
@@ -142,6 +143,7 @@ void callback(char *topic, byte *payload, unsigned int length) {
       protocol = doc["protocol"];
       MAX_GAS_VALUE = doc["max_gas_value"];
       MIN_GAS_VALUE = doc["min_gas_value"];
+      delayFlag = doc["delayFlag"];
       //Se il protocollo non è COAP dobbiamo settare la SAMPLE_FREQUENCY altrimenti i tempi saranno dettati dal server
       if (protocol != COAP)
         SAMPLE_FREQUENCY = doc["sample_frequency"];
@@ -154,6 +156,7 @@ void callback(char *topic, byte *payload, unsigned int length) {
       Serial.println("MAX_GAS_VALUE:" + String(MAX_GAS_VALUE));
       Serial.println("MIN_GAS_VALUE:" + String(MIN_GAS_VALUE));
       Serial.println("SAMPLE_FREQUENCY:" + String(SAMPLE_FREQUENCY));
+      Serial.println("DelayFlag:" + String(delayFlag));
       Serial.println();
 
       //In caso il protocollo non sia stato definito continuiamo a richiedere l'inizializzazione
@@ -332,21 +335,28 @@ void loop() {
       }
 
       if (protocol == MQTT) {
-        tempoInizDelay = millis();
+        if (delayFlag)
+          tempoInizDelay = millis();
         client.publish(topic, messaggio.c_str());   //Se sta usando MQTT allora pubblichiamo al topic dedicato
-        while (!flagAck) {
+        while (!flagAck && delayFlag) {
           client.loop();
         }
-        client.publish(topicDelay, String("{\"id\": \"" + client_id + "\" , \"delay\": " + String(delayMessage) + ", \"protocol\": \"MQTT\" }").c_str());
+        if (delayFlag) {
+          Serial.println("MQTT delay sent!");
+          client.publish(topicDelay, String("{\"id\": \"" + client_id + "\" , \"delay\": " + String(delayMessage) + ", \"protocol\": \"MQTT\" }").c_str());
+        }
         flagAck = false;
       } else if (protocol == HTTP) {
         initHTTP(serverName);                               //Se invece sta usando HTTP inizializziamo il tutto per l'URL dedicato
-        tempoInizDelay = millis();                          //Prendiamo i millisecondi per poi caloclare il delay
+        if (delayFlag)
+          tempoInizDelay = millis();                          //Prendiamo i millisecondi per poi caloclare il delay
         int httpResponseCode = http.POST(messaggio);        //Facciamo la richiesta
-        delayMessage = tempoInizDelay - millis();                  //Calcoliamo il delay
+        if (delayFlag)
+          delayMessage = tempoInizDelay - millis();           //Calcoliamo il delay
         bool ok = stampaErroriHTTP(httpResponseCode);       //Controlliamo che la richiesta sia andata a buon fine
         //Se è andata buon fine inviamo il delay al server
-        if (ok) {
+        if (ok && delayFlag) {
+          Serial.println("HTTP delay sent!");
           client.publish(topicDelay, String("{\"id\": \"" + client_id + "\" , \"delay\": " + String(delayMessage) + ", \"protocol\": \"HTTP\" }").c_str());
         }
         http.end();

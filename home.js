@@ -28,6 +28,23 @@ $('#switchForecasting').on('change', function() {
     $.post("/forecasting", {flag: isChecked});
 });
 
+//Quando attiviamo lo switch del forecasting andiamo a cambiare il booleano
+$('#switchDelay').on('change', function() {
+    let isChecked = $(this).prop('checked')
+    $.post("/delay", {flag: isChecked});
+});
+
+$.get("/get_flags_values").done(function(data) {
+    $("#switchForecasting").attr("checked", data.forecast);
+    let delayBool = true;
+    if (data.delay === 0){
+        delayBool = false
+    }
+    $("#switchDelay").attr("checked", delayBool);
+})
+
+
+
 
 /** MODAL **/
 //Setta il comportamento del modal che si apre quando aggiungiamo un device nella webpage.

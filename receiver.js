@@ -40,6 +40,7 @@ const sampleDim = 78        //Contiene il numero di sample da considerare per ef
 const degree = 1            //Numero di coefficienti da calcolare
 let forecastFlag = false;
 
+
 //Forecasting FBProphet
 const {exec} = require("child_process");
 const path = require("path");
@@ -55,6 +56,8 @@ let admin = require("firebase-admin");
 let db = admin.firestore();
 
 
+let delayFlag = 0;
+
 /** MQTT **/
 //Quando riceve un messaggio MQTT
 clientMQTT.on('message', async (topic, payload) => {
@@ -63,14 +66,14 @@ clientMQTT.on('message', async (topic, payload) => {
         if (payload.toString() !== "Errore") {
             let message = JSON.parse(payload.toString())
             //Mandiamo l'ack per calcolare il delay del messaggio MQTT
-            sendAcknowledgementForDelay(message.i)
+            if (delayFlag) {
+                sendAcknowledgementForDelay(message.i)
+            }
             console.log('MQTT ' + message.i + ' -> ' + JSON.stringify(message))
             await pointCreation(message, "MQTT")
         } else {
             console.log("Non sono riuscito a leggere i dati dai sensori!")
         }
-
-
     } else {
         //Dobbiamo inviare il nuovo delay a firebase, secondo topic
         if (payload.toString() !== "Errore") {
@@ -91,7 +94,7 @@ clientMQTT.on('connect', () => {
 })
 
 //Mandiamo l'acknoledgment all'esp per sapere quanto è stato il delay
-function sendAcknowledgementForDelay(id){
+function sendAcknowledgementForDelay(id) {
     clientMQTT.publish(topic3 + id, "{ack: \'ok\'}", {
         qos: 0,
         retain: false
@@ -105,8 +108,19 @@ function sendAcknowledgementForDelay(id){
 }
 
 //Funzione chiamata da web_page quando viene cambiato il valore dello switch
-function changeForecastFlag(flag) {
-    forecastFlag = flag
+function changeSwitchFlag(flag, switchType) {
+    switch (switchType) {
+        case "forecast":
+            forecastFlag = flag
+            break;
+        case "delay":
+            if (flag === "true") {
+                delayFlag = 1
+            } else {
+                delayFlag = 0;
+            }
+    }
+
 }
 
 //Funzione per creare il punto da salvare su influx
@@ -157,7 +171,7 @@ async function pointCreation(message, protocol) {
         .floatField('tempOpenWeather', tempOpenWeather)
 
     //Se è presente il delay del messaggio allora andiamo a salvarlo su firestore
-    if (message.delayMess !== undefined && message.delayMess !== 0) {
+    if (message.delayMess !== undefined && message.delayMess !== 0 && delayFlag) {
         await sendDelays(message.i, message.delayMess, protocol)
     }
     //Scriviamo il punto su influx
@@ -307,4 +321,4 @@ async function getDelays(id) {
     })
 }
 
-module.exports = {pointCreation, changeForecastFlag}
+module.exports = {pointCreation, changeSwitchFlag}
