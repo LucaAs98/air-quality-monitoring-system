@@ -6,6 +6,7 @@ const open = require('open');
 const app = express();
 const sendAlerts = require("./telegram/index")
 const {pointCreation, changeSwitchFlag} = require("./receiver")
+const {createDeviceMessage, influxDataFormat} = require("./utils")
 const axios = require("axios");
 
 app.set('views', __dirname + '/');
@@ -112,8 +113,8 @@ app.get("/get_influx_data", async (req, res) => {
 app.get("/get_flags_values", async (req, res) => {
     res.json({delay: delayFlag, forecast: forecastFlag});     //Se tutto va bene li restituiamo
 });
-/*** Richieste POST **/
 
+/*** Richieste POST **/
 //A richiesta post della home renidirizziamo l'html
 app.post("/home", (req, res) => {
     res.render("home.html");
@@ -202,6 +203,76 @@ app.post("/delay", async (req, res) => {
         sendNewParameters(parameters)
     })
     res.end();
+});
+
+//Rimuoviamo un device togliendolo da firestore in modo tale da non poterlo più visualizzare nella webpage
+app.post("/remove_device", async (req, res) => {
+    //Rimuoviamo il device da firestore
+    const request = await db.collection('device').doc(req.body.id).delete()
+    //Se sono presenti job con tale device li stoppiamo
+    if (mapJobs.has(req.body.id)) {
+        mapJobs.get(req.body.id).stop()
+        mapJobs.delete(req.body.id)
+    }
+
+    //Segnaliamo all'esp che è stato rimosso dal db
+    let parameters = {
+        id: req.body.id,
+        max_gas_value: 0,
+        min_gas_value: 0,
+        sample_frequency: 1000,
+        protocol: "UNDEFINED"
+    }
+    //Inviamo la segnalazione
+    sendNewParameters(parameters)
+    res.end()
+})
+
+//Riceviamo i dati tramite HTTP dall'esp, creiamo quindi il punto e lo spediamo ad InfluxDB
+app.post('/sensordata', async function (req, res) {
+    let message = req.body
+    console.log("HTTP " + req.body.i + " -> " + JSON.stringify(req.body))
+    await pointCreation(message, "HTTP")
+    res.end();
+});
+
+//Riceviamo la richiesta di inizializzazione da parte dell'esp
+app.post('/initialize', async function (req, res) {
+    let message = req.body
+    //OpenWeather Data
+    const urlOpenWeather = 'https://api.openweathermap.org/data/2.5/weather?lat=' + message.lt + '&lon=' + message.ln + '&units=metric&appid=3e877f0f053735d3715ca7e534ca8efa'
+
+    //Prendiamo la temperatura da openWeatherMap
+    let espPosition = await axios.get(urlOpenWeather).then(response => {
+        return response.data.name + " - " + response.data.sys.country
+    }).catch(error => {
+        console.error("Errore! Non sono riuscito a prendere la posizione dell'esp!")
+    })
+
+    console.log("Richiesta inizializzazione da parte di -> " + message.ip)
+
+    //Prendiamo i parametri Salvati in precedenza da firebase
+    let parameters = arrayESP32.filter(obj => obj.id === message.id)[0]
+
+    //Se ci sono parametri allora settiamo anche l'ip del device e aggiorniamo il suo ip anche su firebase
+    if (parameters !== undefined) {
+        parameters.ip = message.ip;
+        //Aggiorniamo il device a quel determinato id aggiungendo l'ip
+        await db.collection('device').doc(parameters.id).update({
+            ip: message.ip,
+            lt: message.lt,
+            ln: message.ln,
+            city: espPosition
+        })
+        arrayESP32.filter(obj => obj.id === parameters.id)[0] = parameters.ip;
+        parameters.id = message.id
+        //Mandiamo i parametri di inizializzazione all'esp
+        sendNewParameters(parameters)
+        res.end()
+    } else {
+        console.log("Il dispositivo " + message.id + " non è stato ancora registrato!")
+        res.sendStatus(501)
+    }
 });
 
 //Creazione del job COAP
@@ -311,76 +382,6 @@ async function coapRequest(id) {
     }
 }
 
-//Rimuoviamo un device togliendolo da firestore in modo tale da non poterlo più visualizzare nella webpage
-app.post("/remove_device", async (req, res) => {
-    //Rimuoviamo il device da firestore
-    const request = await db.collection('device').doc(req.body.id).delete()
-    //Se sono presenti job con tale device li stoppiamo
-    if (mapJobs.has(req.body.id)) {
-        mapJobs.get(req.body.id).stop()
-        mapJobs.delete(req.body.id)
-    }
-
-    //Segnaliamo all'esp che è stato rimosso dal db
-    let parameters = {
-        id: req.body.id,
-        max_gas_value: 0,
-        min_gas_value: 0,
-        sample_frequency: 1000,
-        protocol: "UNDEFINED"
-    }
-    //Inviamo la segnalazione
-    sendNewParameters(parameters)
-    res.end()
-})
-
-//Riceviamo i dati tramite HTTP dall'esp, creiamo quindi il punto e lo spediamo ad InfluxDB
-app.post('/sensordata', async function (req, res) {
-    let message = req.body
-    console.log("HTTP " + req.body.i + " -> " + JSON.stringify(req.body))
-    await pointCreation(message, "HTTP")
-    res.end();
-});
-
-//Riceviamo la richiesta di inizializzazione da parte dell'esp
-app.post('/initialize', async function (req, res) {
-    let message = req.body
-    //OpenWeather Data
-    const urlOpenWeather = 'https://api.openweathermap.org/data/2.5/weather?lat=' + message.lt + '&lon=' + message.ln + '&units=metric&appid=3e877f0f053735d3715ca7e534ca8efa'
-
-    //Prendiamo la temperatura da openWeatherMap
-    let espPosition = await axios.get(urlOpenWeather).then(response => {
-        return response.data.name + " - " + response.data.sys.country
-    }).catch(error => {
-        console.error("Errore! Non sono riuscito a prendere la posizione dell'esp!")
-    })
-
-    console.log("Richiesta inizializzazione da parte di -> " + message.ip)
-
-    //Prendiamo i parametri Salvati in precedenza da firebase
-    let parameters = arrayESP32.filter(obj => obj.id === message.id)[0]
-
-    //Se ci sono parametri allora settiamo anche l'ip del device e aggiorniamo il suo ip anche su firebase
-    if (parameters !== undefined) {
-        parameters.ip = message.ip;
-        //Aggiorniamo il device a quel determinato id aggiungendo l'ip
-        await db.collection('device').doc(parameters.id).update({
-            ip: message.ip,
-            lt: message.lt,
-            ln: message.ln,
-            city: espPosition
-        })
-        arrayESP32.filter(obj => obj.id === parameters.id)[0] = parameters.ip;
-        parameters.id = message.id
-        //Mandiamo i parametri di inizializzazione all'esp
-        sendNewParameters(parameters)
-        res.end()
-    } else {
-        console.log("Il dispositivo " + message.id + " non è stato ancora registrato!")
-        res.sendStatus(501)
-    }
-});
-
 //Metodo che prende tutti i device da firebase
 async function getDevices() {
     const devicesCollection = await db.collection('device').get();
@@ -416,45 +417,9 @@ async function getDevices() {
     return arrayESP32
 }
 
-//Funzione che crea il messagio da inviare all'esp32
-function createMessage(protocol, sample_frequency, max_gas_value, min_gas_value) {
-    return '{ \"protocol\": \"' + getProtocol(protocol) + '\",' +
-        '\"sample_frequency\":' + sample_frequency + ',' +
-        '\"max_gas_value\":' + max_gas_value + ',' +
-        '\"min_gas_value\":' + min_gas_value + ',' +
-        '\"delayFlag\":' + delayFlag + '}'
-}
-
-/* Funzione che dato il protocollo in stringa restituisce il suo numero corrispondente. Abbiamo fatto questo per prenderlo
-* più semplicemente dall'esp32 occupando anche meno memoria. */
-function getProtocol(protocol) {
-    switch (protocol.trim()) {
-        case "MQTT":
-            return 0;
-        case "HTTP":
-            return 1;
-        case "COAP":
-            return 2;
-        default:
-            return 3;
-    }
-}
-
-//Formattiamo i dati di influx come vogliamo per poterli usare nel nostro codice
-function influxDataFormat(data) {
-    let newData = []
-    data.forEach(obj =>
-        newData.push({
-            id: obj.id,
-            field: obj._field,
-            value: obj._value,
-        }))
-    return newData
-}
-
 //Funzione per inviare i vari parametri al nostro esp
 function sendNewParameters(data) {
-    clientMQTT.publish(topics[0] + data.id, createMessage(data.protocol, data.sample_frequency, data.max_gas_value, data.min_gas_value), {
+    clientMQTT.publish(topics[0] + data.id, createDeviceMessage(data.protocol, data.sample_frequency, data.max_gas_value, data.min_gas_value), {
         qos: 0,
         retain: false
     }, (error) => {

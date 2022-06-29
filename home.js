@@ -44,8 +44,6 @@ $.get("/get_flags_values").done(function(data) {
 })
 
 
-
-
 /** MODAL **/
 //Setta il comportamento del modal che si apre quando aggiungiamo un device nella webpage.
 function setAddDeviceBehaviour() {

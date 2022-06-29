@@ -21,7 +21,7 @@ pathModel = sys.argv[3]
 
 #Query per prendere i dati da INFLUXD per effettuare il training del modello
 query = 'from(bucket: "' + bucket + '")' \
-        ' |> range(start: -24h)' \
+        ' |> range(start: -12h)' \
         ' |> filter(fn: (r) => r._measurement == "measurements")' \
         ' |> filter(fn: (r) => r._field == "' + field + '")' \
         ' |> filter(fn: (r) => r.id == "' + esp + '")'
