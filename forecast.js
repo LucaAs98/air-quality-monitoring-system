@@ -92,7 +92,6 @@ async function tempForecast(id, field, value) {
             writeForecastPoint(id, field, value, forecast, 'TimeSeriesAnalysis')
         }
     })
-
 }
 
 //Eseguiamo il forecast vero e proprio con la libreria "Time series forecasting"
@@ -154,6 +153,5 @@ function forecastFBProphet(esp, field, value, sf) {
         writeForecastPoint(esp, field, value, forecast, "FBProphet")
     })
 }
-
 
 module.exports = {totalForecast}

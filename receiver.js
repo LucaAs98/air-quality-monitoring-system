@@ -96,12 +96,16 @@ function sendAcknowledgementForDelay(id) {
 
 //Funzione chiamata da web_page quando viene cambiato il valore dello switch
 function changeSwitchFlag(flag, switchType) {
+    let boolFlag = false;
+    if (flag === "true"){
+        boolFlag = true
+    }
     switch (switchType) {
         case "forecast":
-            forecastFlag = flag
+            forecastFlag = boolFlag
             break;
         case "delay":
-            if (flag === "true") {
+            if (boolFlag) {
                 delayFlag = 1
             } else {
                 delayFlag = 0;
