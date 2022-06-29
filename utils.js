@@ -6,7 +6,7 @@ let db = admin.firestore();
 
 
 //Funzione che crea il messagio da inviare all'esp32
-function createDeviceMessage(protocol, sample_frequency, max_gas_value, min_gas_value) {
+function createDeviceMessage(protocol, sample_frequency, max_gas_value, min_gas_value, delayFlag) {
     return '{ \"protocol\": \"' + getProtocolFromString(protocol) + '\",' +
         '\"sample_frequency\":' + sample_frequency + ',' +
         '\"max_gas_value\":' + max_gas_value + ',' +

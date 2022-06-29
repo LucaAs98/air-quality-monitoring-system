@@ -419,7 +419,7 @@ async function getDevices() {
 
 //Funzione per inviare i vari parametri al nostro esp
 function sendNewParameters(data) {
-    clientMQTT.publish(topics[0] + data.id, createDeviceMessage(data.protocol, data.sample_frequency, data.max_gas_value, data.min_gas_value), {
+    clientMQTT.publish(topics[0] + data.id, createDeviceMessage(data.protocol, data.sample_frequency, data.max_gas_value, data.min_gas_value, delayFlag), {
         qos: 0,
         retain: false
     }, (error) => {
