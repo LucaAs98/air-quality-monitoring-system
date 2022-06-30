@@ -5,8 +5,8 @@ const express = require("express");
 const open = require('open');
 const app = express();
 const sendAlerts = require("./telegram/index")
-const {pointCreation, changeSwitchFlag} = require("./receiver")
-const {createDeviceMessage, influxDataFormat} = require("./utils")
+const {pointCreation, changeSwitchFlag, sendDelays} = require("./receiver")
+const {createDeviceMessage, influxDataFormat, incrementaCounterMessaggi, resetCounterId} = require("./utils")
 const axios = require("axios");
 
 app.set('views', __dirname + '/');
@@ -268,6 +268,7 @@ app.post('/initialize', async function (req, res) {
         parameters.id = message.id
         //Mandiamo i parametri di inizializzazione all'esp
         sendNewParameters(parameters)
+        resetCounterId(message.id)
         res.end()
     } else {
         console.log("Il dispositivo " + message.id + " non è stato ancora registrato!")
@@ -352,12 +353,13 @@ async function coapRequest(id) {
                     //Al termine della richiesta  se è tutto apposto inviamo il delay al db e creiamo il punto
                     if (res.code === '2.05') {
                         //Alla prima richiesta non mandiamo il delay perchè ci può essere ancora in esecuzione l'invio di un messaggio precedente
-                        if (!obj.prima_richiesta)
-                            tempoFinalPerformance = new Date()
-                        else obj.prima_richiesta = false
-
+                        tempoFinalPerformance = new Date()
                         console.log("COAP " + id + " -> " + JSON.stringify(jsonData))
-                        jsonData.delayMess = tempoInizPerformance - tempoFinalPerformance
+
+                        let delayMess = tempoInizPerformance - tempoFinalPerformance
+                        if (delayFlag){
+                            sendDelays(id, delayMess, "COAP")
+                        }
                         await pointCreation(jsonData, "COAP")
                     } else {
                         //Stampiamo l'errore

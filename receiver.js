@@ -5,7 +5,7 @@ const fs = require('fs')
 var express = require('express'),
     router = express.Router();
 
-let {sendDelays} = require("./utils")
+let {sendDelays, incrementaCounterMessaggi, resetAllCounters, sendPacketNumber} = require("./utils")
 let {totalForecast} = require("./forecast")
 
 //Inizializza MQTT
@@ -22,8 +22,9 @@ const clientMQTT = mqtt.connect(connectUrl, {
 })
 const topic1 = "sensor/values"      //Topic per la ricezione dei valori dell'esp
 const topic2 = "delay"              //Topic per la ricezione del delay calcolato sull'esp
-const topic3 = "acknowledgement/"    //Topic perinviare l'ack all'esp quando invia messaggi MQTT
-const topics = [topic1, topic2]
+const topic3 = "acknowledgement/"    //Topic per inviare l'ack all'esp quando invia messaggi MQTT
+const topic4 = "packet_number/"    //Topic per riceveere il numero di pacchetti da parte di una determinata scheda
+const topics = [topic1, topic2, topic4]
 
 //INFLUXDB
 const token = variables.TOKEN_INFLUX
@@ -48,26 +49,46 @@ let delayFlag = 0;
 /** MQTT **/
 //Quando riceve un messaggio MQTT
 clientMQTT.on('message', async (topic, payload) => {
-    if (topic !== topics[1]) {
-        //Abbiamo ricevuto un messaggio tramite MQTT al primo topic
-        if (payload.toString() !== "Errore") {
-            let message = JSON.parse(payload.toString())
-            //Mandiamo l'ack per calcolare il delay del messaggio MQTT
-            if (delayFlag) {
-                sendAcknowledgementForDelay(message.i)
+    switch (topic) {
+        case topics[0]: {
+            //Abbiamo ricevuto un messaggio tramite MQTT al primo topic
+            if (payload.toString() !== "Errore") {
+                let message = JSON.parse(payload.toString())
+                //Mandiamo l'ack per calcolare il delay del messaggio MQTT
+                if (delayFlag) {
+                    sendAcknowledgementForDelay(message.i)
+                }
+                console.log('MQTT ' + message.i + ' -> ' + JSON.stringify(message))
+                await pointCreation(message, "MQTT")
+            } else {
+                console.log("Non sono riuscito a leggere i dati dai sensori!")
             }
-            console.log('MQTT ' + message.i + ' -> ' + JSON.stringify(message))
-            await pointCreation(message, "MQTT")
-        } else {
-            console.log("Non sono riuscito a leggere i dati dai sensori!")
         }
-    } else {
-        //Dobbiamo inviare il nuovo delay a firebase, secondo topic
-        if (payload.toString() !== "Errore") {
-            let message = JSON.parse(payload.toString())
-            await sendDelays(message.id, message.delay, message.protocol)
-        } else {
-            console.log("Errore nei dati del delay!")
+            break;
+        case topics[1]: {
+            //Dobbiamo inviare il nuovo delay a firebase, secondo topic
+            if (payload.toString() !== "Errore") {
+                let message = JSON.parse(payload.toString())
+                await sendDelays(message.id, message.delay, message.protocol)
+            } else {
+                console.log("Errore nei dati del delay!")
+            }
+        }
+            break;
+        case topics[2]: {
+            console.log("Ho ricevuto il numero di pacchetti!")
+            if (payload.toString() !== "Errore") {
+                let message = JSON.parse(payload.toString())
+                let data = {
+                    MQTT: message.MQTT_packets,
+                    HTTP: message.HTTP_packets,
+                    COAP: message.COAP_packets,
+                }
+                console.log("ID -> " + message.id + ", MQTT packets: " + message.MQTT_packets + ", HTTP packets: " + message.HTTP_packets + ", COAP packets: " + message.COAP_packets)
+                sendPacketNumber(message.id, data)
+            } else {
+                console.log("Errore nei dati del delay!")
+            }
         }
     }
 })
@@ -97,7 +118,7 @@ function sendAcknowledgementForDelay(id) {
 //Funzione chiamata da web_page quando viene cambiato il valore dello switch
 function changeSwitchFlag(flag, switchType) {
     let boolFlag = false;
-    if (flag === "true"){
+    if (flag === "true") {
         boolFlag = true
     }
     switch (switchType) {
@@ -106,6 +127,7 @@ function changeSwitchFlag(flag, switchType) {
             break;
         case "delay":
             if (boolFlag) {
+                resetAllCounters()
                 delayFlag = 1
             } else {
                 delayFlag = 0;
@@ -163,12 +185,11 @@ async function pointCreation(message, protocol) {
     if (tempOpenWeather !== undefined)
         point.floatField('tempOpenWeather', tempOpenWeather)
 
-    //Se è presente il delay del messaggio allora andiamo a salvarlo su firestore
-    if (message.delayMess !== undefined && message.delayMess !== 0 && delayFlag) {
-        await sendDelays(message.i, message.delayMess, protocol)
+    if (delayFlag) {
+        incrementaCounterMessaggi(message.i, protocol)
     }
     //Scriviamo il punto su influx
     writeClient.writePoint(point)
 }
 
-module.exports = {pointCreation, changeSwitchFlag}
+module.exports = {pointCreation, changeSwitchFlag, sendDelays}

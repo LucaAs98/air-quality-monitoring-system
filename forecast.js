@@ -25,7 +25,7 @@ const folderPath = path.resolve()                                               
 const pythonScriptTrain = folderPath + "\\prophetForecasting\\fitmodel.py"              //Path dove salvare i coefficienti
 const pythonScriptForecast = folderPath + "\\prophetForecasting\\forecasting.py"        //Path dello script che esegue FBProphet
 const measurementForecast = "forecastingExample"                                        //Measurement per salvare i dati del forecast
-
+    /** RICORDA DI CAMBIARE ^^^^^^^^^^^^^^^^^^^ CON measurements_forecasting **/
 //FIREBASE
 let admin = require("firebase-admin");
 let db = admin.firestore();

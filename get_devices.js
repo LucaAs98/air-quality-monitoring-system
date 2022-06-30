@@ -164,10 +164,10 @@ function creaDivCarta(dataFirestore, dataInflux) {
                     <div class="vr col-md-1 offset-md-1"></div>
                     <div class="col-md-5 ms-auto">
                         <div class="d-grid gap-2">
-                            <button class="btn btn-primary" type="button" id="grafana_${dataFirestore.id}">Vedi su grafana</button>
-                            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" href="#map_div_${dataFirestore.id}" role="button" aria-expanded="false" aria-controls="map_div_${dataFirestore.id}">Vedi su mappa</button>
-                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target=#modal${dataFirestore.id} data-bs-whatever=${dataFirestore.id}>Cambia Parametri</button>
-                            <button class="btn btn-danger" type="button" id="remove_${dataFirestore.id}">Rimuovi</button>
+                            <button class="btn btn-primary" type="button" id="grafana_${dataFirestore.id}">Dashboard Grafana</button>
+                            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" href="#map_div_${dataFirestore.id}" role="button" aria-expanded="false" aria-controls="map_div_${dataFirestore.id}">View position</button>
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target=#modal${dataFirestore.id} data-bs-whatever=${dataFirestore.id}>Change parameters</button>
+                            <button class="btn btn-danger" type="button" id="remove_${dataFirestore.id}">Remove</button>
                         </div>
                     </div>
                 </div>
@@ -223,7 +223,7 @@ function creaDivCarta(dataFirestore, dataInflux) {
               </div>
                   <div class="modal-footer">
                     <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-success" id="change_parameters_${dataFirestore.id}">Cambia parametri</button>
+                    <button type="button" class="btn btn-success" id="change_parameters_${dataFirestore.id}">Change parameters</button>
                   </div>
                 </div>
             </form>

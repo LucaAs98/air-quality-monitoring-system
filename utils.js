@@ -4,6 +4,7 @@ const fs = require("fs");
 let admin = require("firebase-admin");
 let db = admin.firestore();
 
+let mappaCounters = new Map()
 
 //Funzione che crea il messagio da inviare all'esp32
 function createDeviceMessage(protocol, sample_frequency, max_gas_value, min_gas_value, delayFlag) {
@@ -64,15 +65,28 @@ async function getDelays() {
 
 //Funzione per inviare i delay a firestore
 async function sendDelays(id, delay, protocol) {
-    console.log("Delay inviato!")
+    console.log("Delay inviato! " + id + " -> " + protocol + "  Delay _> " + delay)
     await db.collection('delay_mess').doc(id).collection('tempi').doc((new Date()).toString()).set({
         protocol: protocol,
         delay: delay
     })
 }
 
+//Funzione per inviare i delay a firestore
+async function sendPacketNumber(id, realPackets) {
+    console.log("Numero pacchetti salvato su firestore! " + id)
+    await db.collection('num_pacchetti').doc(id).set({
+        MQTT_arr: mappaCounters.get(id).MQTT,
+        MQTT_real: realPackets.MQTT,
+        HTTP_arr: mappaCounters.get(id).HTTP,
+        HTTP_real: realPackets.HTTP,
+        COAP_arr: mappaCounters.get(id).COAP,
+        COAP_real: realPackets.COAP,
+    })
+}
+
 function scriviSuExcel(delays) {
-    let writeStream = fs.createWriteStream("delays.xls");
+    let writeStream = fs.createWriteStream("delays.xlsx");
     let header = "ID" + "\t" + " Protocol" + "\t" + "Value" + "\n";
     writeStream.write(header);
 
@@ -84,5 +98,36 @@ function scriviSuExcel(delays) {
     writeStream.close();
 }
 
+function incrementaCounterMessaggi(id, protocollo){
+    if (!mappaCounters.has(id)){
+        mappaCounters.set(id, {MQTT: 0, HTTP: 0, COAP: 0})
+    }
 
-module.exports = {getAndWriteDelays, sendDelays, createDeviceMessage, influxDataFormat}
+    let countersObj = mappaCounters.get(id)
+    switch (protocollo) {
+        case "MQTT": {
+            countersObj.MQTT++
+            break;
+        }
+        case "HTTP": {
+            countersObj.HTTP++
+            break;
+        }
+        case "COAP": {
+            countersObj.COAP++
+            break;
+        }
+    }
+    mappaCounters.set(id, countersObj)
+    console.log("Mappa modificata: " + JSON.stringify(mappaCounters.get(id)))
+}
+
+function resetAllCounters() {
+    mappaCounters = new Map()
+}
+
+function resetCounterId(id){
+    mappaCounters.set(id, {MQTT: 0, HTTP: 0, COAP: 0})
+}
+
+module.exports = {getAndWriteDelays, sendDelays, createDeviceMessage, influxDataFormat, incrementaCounterMessaggi, resetAllCounters, resetCounterId, sendPacketNumber}

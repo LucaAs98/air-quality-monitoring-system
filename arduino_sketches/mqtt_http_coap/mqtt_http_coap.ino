@@ -27,7 +27,7 @@ String serverInit = "http://192.168.1.7:3000/initialize";   //URL per richiesta 
 //Position (Hardcoded)
 const float lat = 44.4945441;
 const float lon = 11.3440067;
-String client_id = "esp32_nash";    //Client ID (Hardcoded)
+String client_id = "esp32_caio";    //Client ID (Hardcoded)
 const int n_measure_aqi = 5;        //Quante misure del gas prendere per calcolare aqi
 int current_measure = 0;            //Misura corrente per calcolo aqi
 int protocol = MQTT;                //Protocollo di default
@@ -38,20 +38,22 @@ float arrGas[n_measure_aqi] = {};   //Array dove vengono salvati tutti i valori 
 bool inizializzato = false;         //Flag per verificare che l'esp sia inizializzato
 int countDelayInit = 0;             //Count utile per capire quando effettuare la nuova richiesta di inizializzazione
 String initString = "Sto facendo la richiesta di inizializzazione...";
-int tempoInizDelay = 0;           //Variabile che prenderà sempre i millisecondi iniziali, utile per il calcolo del delay HTTP
+int tempoInizDelay = 0;             //Variabile che prenderà sempre i millisecondi iniziali, utile per il calcolo del delay HTTP
 bool delayFlag = false;
-int counterSF = 0;                  // COntatore per le operazioni di MQTT e HTTP
+int counterSF = 0;                  //Contatore per le operazioni di MQTT e HTTP
 int countProt[3] = {0, 0, 0};
+
 
 //MQTT
 const char *mqtt_broker = "broker.emqx.io";     //Broker MQTT pubblico
 const char *mqtt_username = "emqx";
 const char *mqtt_password = "public";
 const int mqtt_port = 1883;
-const char *topic = "sensor/values";                          //Topic per inviare i dati dei sensori
-const char *topicDelay = "delay";                             //Topic per inviare il delay della richiesta HTTP dopo che viene calcolato
-String topicReceive = String("device/parameters/" + client_id);    //Topic per ricevere i parametri dell'esp dal server
-String topicAck = String("acknowledgement/" + client_id);        //Topic per ricevere l'ack quando invia un messaggio MQTT
+const char *topic = "sensor/values";                                //Topic per inviare i dati dei sensori
+const char *topicDelay = "delay";                                   //Topic per inviare il delay della richiesta HTTP dopo che viene calcolato
+String topicReceive = String("device/parameters/" + client_id);     //Topic per ricevere i parametri dell'esp dal server
+String topicAck = String("acknowledgement/" + client_id);           //Topic per ricevere l'ack quando invia un messaggio MQTT
+String topicPacketNumber = String("packet_number/");           //Topic per ricevere l'ack quando invia un messaggio MQTT
 
 bool flagAck = false;
 
@@ -146,7 +148,8 @@ void callback(char *topic, byte *payload, unsigned int length) {
       protocol = doc["protocol"];
       MAX_GAS_VALUE = doc["max_gas_value"];
       MIN_GAS_VALUE = doc["min_gas_value"];
-      delayFlag = doc["delayFlag"];
+      bool newDelayFlag = doc["delayFlag"];
+
       //Se il protocollo non è COAP dobbiamo settare la SAMPLE_FREQUENCY altrimenti i tempi saranno dettati dal server
       if (protocol != COAP)
         SAMPLE_FREQUENCY = doc["sample_frequency"];
@@ -162,11 +165,19 @@ void callback(char *topic, byte *payload, unsigned int length) {
       Serial.println("MAX_GAS_VALUE:" + String(MAX_GAS_VALUE));
       Serial.println("MIN_GAS_VALUE:" + String(MIN_GAS_VALUE));
       Serial.println("SAMPLE_FREQUENCY:" + String(SAMPLE_FREQUENCY));
-      Serial.println("DelayFlag:" + String(delayFlag));
+      Serial.println("DelayFlag:" + String(newDelayFlag));
       Serial.println();
 
       //In caso il protocollo non sia stato definito continuiamo a richiedere l'inizializzazione
       if (protocol != UNDEFINED) {
+        //Se il dispositivo è inizializzato allora controllliamo se c'è da inviare il numero dei pacchetti
+        if (delayFlag && !newDelayFlag) {
+          client.publish(topicPacketNumber.c_str(), String("{\"id\": \"" + client_id + "\" , \"MQTT_packets\": " + String(countProt[MQTT]) + " , \"HTTP_packets\": " + String(countProt[HTTP]) +  " , \"COAP_packets\": " + String(countProt[COAP]) + "}").c_str());
+          countProt[MQTT] = 0;
+          countProt[HTTP] = 0;
+          countProt[COAP] = 0;
+        }
+        delayFlag = newDelayFlag;
         inizializzato = true;
       } else {
         inizializzato = false;
@@ -281,9 +292,9 @@ String calcoloValori() {
     Serial.println(client_id + " - Protocollo: " + protocol + " --> " + msg);   //Stampiamo per vedere se il messaggio è corretto
     if (delayFlag) {
       countProt[protocol] += 1;
-      Serial.println("N MQTT -> " + String(countProt[0]));
-      Serial.println("N HTTP -> " + String(countProt[1]));
-      Serial.println("N COAP -> " + String(countProt[2]));
+      Serial.println("N MQTT -> " + String(countProt[MQTT]));
+      Serial.println("N HTTP -> " + String(countProt[HTTP]));
+      Serial.println("N COAP -> " + String(countProt[COAP]));
     }
     return msg;
   }
