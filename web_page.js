@@ -357,7 +357,7 @@ async function coapRequest(id) {
                         console.log("COAP " + id + " -> " + JSON.stringify(jsonData))
 
                         let delayMess = tempoInizPerformance - tempoFinalPerformance
-                        if (delayFlag){
+                        if (delayFlag) {
                             sendDelays(id, delayMess, "COAP")
                         }
                         await pointCreation(jsonData, "COAP")
@@ -389,17 +389,25 @@ async function getDevices() {
     const devicesCollection = await db.collection('device').get();
     arrayESP32 = []
 
+
     //Per ognuno di essi assegnamo tutti i parametri necessari.
     devicesCollection.forEach((result) => {
         let resD = result.data()
+        let lt = 44.490931818740
+        let ln = 11.35460682369
+        if (resD.lt !== undefined) {
+            lt = resD.lt
+            ln = resD.ln
+        }
+
         let data = {
             id: result.id,
             max_gas_value: resD.max_gas_value,
             min_gas_value: resD.min_gas_value,
             sample_frequency: resD.sample_frequency,
             protocol: resD.protocol.trim(),
-            lat: 44.490931818740, /******************** CONTROLLA *************/
-            long: 11.35460682369,
+            lat: lt,
+            long: ln,
             prima_richiesta: true
         }
         if (resD.ip !== undefined) {
