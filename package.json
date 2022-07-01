@@ -18,7 +18,8 @@
     "firebase": "^9.8.2",
     "jsdom": "^19.0.0",
     "node-telegram-bot-api": "^0.57.0",
-    "open": "^8.4.0"
+    "open": "^8.4.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@babel/helper-compilation-targets": "^7.18.2",

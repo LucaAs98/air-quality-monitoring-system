@@ -2,6 +2,7 @@ const fs = require("fs");
 
 /** Inizializzazione FIREBASE **/
 let admin = require("firebase-admin");
+const reader = require("xlsx");
 let db = admin.firestore();
 
 let mappaCounters = new Map()
@@ -86,16 +87,10 @@ async function sendPacketNumber(id, realPackets) {
 }
 
 function scriviSuExcel(delays) {
-    let writeStream = fs.createWriteStream("delays.xlsx");
-    let header = "ID" + "\t" + " Protocol" + "\t" + "Value" + "\n";
-    writeStream.write(header);
-
-    delays.forEach(obj => {
-        let row = "" + obj.id + "\t" + " " + obj.protocol + "\t" + obj.delay + "\n"
-        writeStream.write(row);
-    })
-
-    writeStream.close();
+    let workBook = reader.utils.book_new();
+    const ws = reader.utils.json_to_sheet(delays)
+    reader.utils.book_append_sheet(workBook, ws, "Delays")
+    reader.writeFile(workBook, './delays.xlsx')
 }
 
 function incrementaCounterMessaggi(id, protocollo){
