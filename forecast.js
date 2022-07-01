@@ -24,8 +24,7 @@ const environmentName = "air-quality-monitoring-system"                         
 const folderPath = path.resolve()                                                       //Path dove risiede questo script
 const pythonScriptTrain = folderPath + "\\prophetForecasting\\fitmodel.py"              //Path dove salvare i coefficienti
 const pythonScriptForecast = folderPath + "\\prophetForecasting\\forecasting.py"        //Path dello script che esegue FBProphet
-const measurementForecast = "forecastingExample"                                        //Measurement per salvare i dati del forecast
-    /** RICORDA DI CAMBIARE ^^^^^^^^^^^^^^^^^^^ CON measurements_forecasting **/
+const measurementForecast = "measurementForecasting"                                  //Measurement per salvare i dati del forecast
 //FIREBASE
 let admin = require("firebase-admin");
 let db = admin.firestore();
@@ -54,10 +53,16 @@ async function totalForecast(id, temp, hum, gas) {
 
 //Funzione generale per scrivere un punto forecastato. Prende in input che algoritmo è stato usato
 function writeForecastPoint(id, field, value, forecast, algorithm) {
+    let forC
+    if(isNaN(forecast))
+        forC = 0
+    else
+        forC = forecast
+
     let point = new Point(measurementForecast)
         .tag('id', id)
         .tag('algorithm', algorithm)
-        .floatField('forecast_' + field, forecast.toFixed(2))           //Valore forecastato
+        .floatField('forecast_' + field, forC.toFixed(2))           //Valore forecastato
         .floatField(field, value)                                                       //Valore reale
 
     writeClient.writePoint(point)
