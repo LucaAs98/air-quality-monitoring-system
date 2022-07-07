@@ -356,7 +356,7 @@ async function coapRequest(id) {
                         tempoFinalPerformance = new Date()
                         console.log("COAP " + id + " -> " + JSON.stringify(jsonData))
 
-                        let delayMess = tempoInizPerformance - tempoFinalPerformance
+                        let delayMess = tempoFinalPerformance - tempoInizPerformance
                         if (delayFlag) {
                             sendDelays(id, delayMess, "COAP")
                         }
