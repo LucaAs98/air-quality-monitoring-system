@@ -15,19 +15,19 @@
 #define MAX_DELAY_INIT 19000  //Delay prima di fare una nuova richiesta di inizializzazione +1000 generale
 
 // WiFi
-const char *ssid = "Vodafone-C02090047";        // WiFi name
-const char *password = "ERxFJfcyc3rtpY3H";      // WiFi password
+const char *ssid = "OnePlus8T";        // WiFi name
+const char *password = "presentation";      // WiFi password
 
 //HTTP
-String serverName = "http://192.168.1.7:3000/sensordata";   //URL per inviare dati con HTTP
+String serverName = "http://192.168.157.47:3000/sensordata";   //URL per inviare dati con HTTP
 HTTPClient http;
-String serverInit = "http://192.168.1.7:3000/initialize";   //URL per richiesta di inizializzazione dell'esp
+String serverInit = "http://192.168.157.47:3000/initialize";   //URL per richiesta di inizializzazione dell'esp
 
 //Variables
 //Position (Hardcoded)
-const float lat = 44.4945441;
-const float lon = 11.3440067;
-String client_id = "esp32_caio";    //Client ID (Hardcoded)
+const float lat = 44.65375083043781;
+const float lon = 10.89768151136346;
+String client_id = "esp32_prova100";    //Client ID (Hardcoded)
 const int n_measure_aqi = 5;        //Quante misure del gas prendere per calcolare aqi
 int current_measure = 0;            //Misura corrente per calcolo aqi
 int protocol = MQTT;                //Protocollo di default
@@ -75,7 +75,7 @@ PubSubClient client(espClient);
 DHT dht(DHTPIN, DHTTYPE);
 //MQ-2
 int greenLed = 13;
-int smokeA0 = A5;
+int smokeA0 = 34;
 
 //Inizializzazione connessione wifi
 void initWiFi() {
@@ -149,12 +149,7 @@ void callback(char *topic, byte *payload, unsigned int length) {
       MAX_GAS_VALUE = doc["max_gas_value"];
       MIN_GAS_VALUE = doc["min_gas_value"];
       bool newDelayFlag = doc["delayFlag"];
-
-      //Se il protocollo non è COAP dobbiamo settare la SAMPLE_FREQUENCY altrimenti i tempi saranno dettati dal server
-      if (protocol != COAP)
-        SAMPLE_FREQUENCY = doc["sample_frequency"];
-      else
-        SAMPLE_FREQUENCY = 1000;
+      SAMPLE_FREQUENCY = doc["sample_frequency"];
 
       if (protocol != exProt)
         counterSF = SAMPLE_FREQUENCY;
@@ -262,10 +257,11 @@ boolean stampaErroriHTTP(int httpResponseCode) {
 
 //Callback COAP, chiamata quando deve inviare un messaggio tramite il protocollo COAP
 void callback_sensordata(CoapPacket &packet, IPAddress ip, int port) {
-  const char *messaggio = calcoloValori().c_str();      //Prendiamo i valori dai sensori e restituiamo il messaggio da inviare
+  Serial.println("[Coap request got]");
+   String messaggioCoap = calcoloValori();      //Prendiamo i valori dai sensori e restituiamo il messaggio da inviare
   //Invio della risposta COAP
-  coap.sendResponse(ip, port, packet.messageid, messaggio,
-                    strlen(messaggio), COAP_CONTENT, COAP_APPLICATION_JSON,
+  coap.sendResponse(ip, port, packet.messageid, messaggioCoap.c_str(),
+                    strlen(messaggioCoap.c_str()), COAP_CONTENT, COAP_APPLICATION_JSON,
                     packet.token, packet.tokenlen);
 }
 
@@ -277,7 +273,7 @@ String calcoloValori() {
 
   //MQ-2
   int g = analogRead(smokeA0);          //Leggiamo il valore del gas
-
+  
   //Controlliamo che non ci siano stati errori nella lettura dei valori dei sensori
   if (isnan(h) || isnan(t) || isnan(g)) {
     Serial.println(F("Failed to read from sensors!"));
@@ -334,7 +330,8 @@ void checkInitRequest() {
 void setup() {
   // Set software serial baud to 115200;
   Serial.begin(115200);
-
+  //Delay iniziale per visualizzare tutto sul monitor
+  delay(5000);
   //Inizializziamo tutto
   initWiFi();
   initMQTT();

@@ -29,6 +29,7 @@ const connectUrl = `mqtt://${host}:${port}`
 const clientMQTT = mqtt.connect(connectUrl, {
     clean: true,
     connectTimeout: 4000,
+    clientId: "nash",
     username: variables.USERNAME_MQTT,
     password: variables.PASSWORD_MQTT,
     reconnectPeriod: 1000,
@@ -84,7 +85,7 @@ app.get("/devices", async (req, res) => {
 app.get("/get_influx_data", async (req, res) => {
     let fluxQuery =
         `from(bucket: "${bucket}")
-                |> range(start: -1d)
+                |> range(start: -5m)
                 |> filter(fn: (r) => r["_field"] != "_message")
                 |> group(columns: ["id", "_field"])
                 |> mean()`
@@ -132,8 +133,8 @@ app.post("/add_device", async (req, res) => {
 
     //Creaimo un doc chiamato con l'id e salviamo all'interno di esso tutti i dati relativi a quel determinato device
     const request = await db.collection('device').doc(id).set(data)
-    data.id = id;
-    sendNewParameters(data)
+    //data.id = id;
+    //sendNewParameters(data)
 });
 
 //Inviamo l'update del device
@@ -169,6 +170,13 @@ app.post("/update_device", async (req, res) => {
                 mapJobs.get(id).stop()
                 mapJobs.delete(id)
             }
+            break;
+        case 2:
+            if (mapJobs.has(id)) {
+                mapJobs.get(id).stop()
+                mapJobs.delete(id)
+            }
+            createCoAPJob(id, data.sample_frequency)
             break;
     }
     res.end();

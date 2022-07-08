@@ -276,6 +276,7 @@ function setChangeParamBehaviour(dataFirestore) {
                     let newProtocol = modalBodyInputProtocol.textContent.trim()
                     //Prendiamo il vecchio protocollo per verificare che ci sia stato o meno un passaggio da "qualcosa" a COAP
                     let oldProtocol = arrayESP32.find(e => e.id === dataFirestore.id).protocol
+                    let oldSF = arrayESP32.find(e => e.id === dataFirestore.id).sample_frequency
                     let coapOp      //Operazione da fare a seconda di oldProtocol
 
                     if (oldProtocol !== newProtocol) {
@@ -285,10 +286,12 @@ function setChangeParamBehaviour(dataFirestore) {
                             if (oldProtocol === 'COAP' && newProtocol !== 'COAP') {
                                 coapOp = 1  //Ferma job coap
                             } else
-                                coapOp = 2  //Non fare niente
+                                coapOp = 3  //Non fare niente
                         }
                     } else {
-                        coapOp = 2          //Non fare niente
+                        if (oldProtocol === 'COAP' && newProtocol === 'COAP' && oldSF !== modalBodyInputSample.value) {
+                            coapOp = 2
+                        } else coapOp = 3          //Non fare niente
                     }
 
                     //Estraiamo i dati dai vari campi e creiamo l'oggetto con i nuovi valori
