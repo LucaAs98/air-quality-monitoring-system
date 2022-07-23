@@ -29,7 +29,6 @@ const connectUrl = `mqtt://${host}:${port}`
 const clientMQTT = mqtt.connect(connectUrl, {
     clean: true,
     connectTimeout: 4000,
-    clientId: "nash",
     username: variables.USERNAME_MQTT,
     password: variables.PASSWORD_MQTT,
     reconnectPeriod: 1000,
@@ -45,15 +44,15 @@ let org = variables.ORG_INFLUX
 let bucket = variables.BUCKET_INFLUX
 let queryClient = clientInflux.getQueryApi(org)
 
-//CoAP
+/** CoAP **/
 const coap = require('coap')
 const CronJob = require('cron').CronJob;
 const CronTime = require('cron').CronTime;
 let mapJobs = new Map()     //Mappa lista dei job attivi
 
+/** VARIABILI **/
 //Contiene gli esp presenti su firebase
 let arrayESP32 = [];
-
 //Flag delay da segnalare all'esp
 let delayFlag = 0;
 let forecastFlag = false;
@@ -133,8 +132,6 @@ app.post("/add_device", async (req, res) => {
 
     //Creaimo un doc chiamato con l'id e salviamo all'interno di esso tutti i dati relativi a quel determinato device
     const request = await db.collection('device').doc(id).set(data)
-    //data.id = id;
-    //sendNewParameters(data)
 });
 
 //Inviamo l'update del device

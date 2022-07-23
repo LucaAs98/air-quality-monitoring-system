@@ -19,7 +19,7 @@ esp = sys.argv[1]
 field = sys.argv[2]
 pathModel = sys.argv[3]
 
-#Query per prendere i dati da INFLUXD per effettuare il training del modello
+#Query per prendere i dati da INFLUXDB per effettuare il training del modello
 query = 'from(bucket: "' + bucket + '")' \
         ' |> range(start: -24h)' \
         ' |> filter(fn :(r) => r["_time"] <= time(v:"2022-06-30T10:34:27.001Z") or r["_time"] > time(v:"2022-06-30T13:11:23.426Z") )' \

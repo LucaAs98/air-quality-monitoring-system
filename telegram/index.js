@@ -6,7 +6,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const CronJob = require('cron').CronJob;
 const CronTime = require('cron').CronTime;
 
-//Definizione delle costanti
+/** COSTANTI **/
 const REPORT = "report"
 const TEMP = "temperature"
 const HUM = "humidity"
@@ -23,7 +23,7 @@ admin.initializeApp({
 });
 let db = admin.firestore();
 
-//INFLUXDB
+/** INFLUXDB **/
 let variables = process.env
 const token = variables.TOKEN_INFLUX
 const url = variables.URL_INFLUX
@@ -391,7 +391,7 @@ function createQuery(chatId, idQuery) {
     //Prendiamo la scheda associata all'utente
     let nameBoard = activeUsers.get(chatId).scheda
 
-    if(idQuery === "report"){
+    if (idQuery === "report") {
         return `from(bucket: "${bucket}") |> range(start: -${tempo_report}m) 
             |> filter(fn: (r) => r.id == "${nameBoard}" and r._field != "gas" )
             |>group(columns: ["_field"]) |> mean()`
@@ -556,7 +556,7 @@ async function setEsp(chatId, msg) {
         let textMsg = msg.text.trim()                  //Esp selezionato da tastiera
 
         //Verifichiamo che l'esp selezionato sia esistente
-        if(devices.has(textMsg)){
+        if (devices.has(textMsg)) {
             let jsonData = {
                 scheda: textMsg,
                 report: null
@@ -584,7 +584,7 @@ async function changeEsp(chatId, msg) {
         let flagInterno = false
 
         //Verifichiamo che l'esp selezionato sia esistente
-        if(devices.has(textMsg)){
+        if (devices.has(textMsg)) {
             let jsonData = {
                 scheda: textMsg,
                 report: null

@@ -1,9 +1,11 @@
+/** SCRITTE INIZIALI **/
 //Nascondiamo la scritta che non ci sono device registrati. Verrà mostrata se dopo averli presi non ne abbiamo.
 $("#no_device").hide()
 
 //Nascondiamo l'errore dell'id già presente per mostrarlo quando necessario
 $("#errore_id_presente").hide()
 
+/** CARICAMENTO DEVICE **/
 //Prendiamo tutti i device presenti su firestore, creiamo le loro carte e li visualizziamo nella webpage.
 $.getScript("./get_devices.js")
     .done(function (script, textStatus) {
@@ -22,29 +24,37 @@ $(`.dropdown-item`).on('click', function () {
     $(`#protocol_dropdown`).text(protocol)
 })
 
+/** SWITCH **/
 //Quando attiviamo lo switch del forecasting andiamo a cambiare il booleano
-$('#switchForecasting').on('change', function() {
+$('#switchForecasting').on('change', function () {
     let isChecked = $(this).prop('checked')
     $.post("/forecasting", {flag: isChecked});
 });
 
 //Quando attiviamo lo switch del forecasting andiamo a cambiare il booleano
-$('#switchDelay').on('change', function() {
+$('#switchDelay').on('change', function () {
     let isChecked = $(this).prop('checked')
     $.post("/delay", {flag: isChecked});
 });
 
-$.get("/get_flags_values").done(function(data) {
-    $("#switchForecasting").attr("checked", data.forecast);
-    let delayBool = true;
-    if (data.delay === 0){
-        delayBool = false
+//Get utile ogni volta che carichiamo la pagina per ricavarci i valori degli switch
+$.get("/get_flags_values").done(function (data) {
+    let forecastBool = false;
+    let delayBool = false;
+
+    if (data.forecast === "true") {
+        forecastBool = true
     }
+
+    if (data.delay === 1) {
+        delayBool = true
+    }
+    $("#switchForecasting").attr("checked", forecastBool);
     $("#switchDelay").attr("checked", delayBool);
 })
 
 
-/** MODAL **/
+/** MODAL BOTTONE ADD DEVICE **/
 //Setta il comportamento del modal che si apre quando aggiungiamo un device nella webpage.
 function setAddDeviceBehaviour() {
     //Comportamento del modal che si apre quando aggiungiamo un device nella webpage.

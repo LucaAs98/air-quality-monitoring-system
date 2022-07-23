@@ -1,4 +1,4 @@
-/** Inizializzazione slider per aggiunta nuovo dispositivo **/
+/** Inizializzazione slider per add device button modal **/
 let id = "home"
 setSliderBehaviour(id, "min_gas_value")
 setSliderBehaviour(id, "max_gas_value")
@@ -19,8 +19,10 @@ window.influxData = [];
 /* Prendiamo sia gli esp32 presenti su firestore che i loro dati su influx. Successivamente andiamo ad aggiungere quelli
 * registrati sulla webpage. */
 async function getDevices() {
+    //Firestore data
     const response = await fetch('/devices');
     window.arrayESP32 = await response.json()
+    //Influx data
     const responseInflux = await fetch('/get_influx_data');
     window.influxData = await responseInflux.json()
 

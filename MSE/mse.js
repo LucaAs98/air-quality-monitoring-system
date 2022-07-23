@@ -15,7 +15,7 @@ const fs = require('fs');
 
 function buildQuery(id, alg, field) {
     return `t1 = from(bucket: "iotProject2022")
-|> range(start: -7d)
+|> range(start: -2d)
 |> filter(fn: (r) => r["_measurement"] == "${measurement}")
 |> filter(fn: (r) => r["_field"] == "forecast_${field}")
 |> filter(fn: (r) => r["algorithm"] == "${alg}")
@@ -24,7 +24,7 @@ function buildQuery(id, alg, field) {
 |> rename(columns:{"_value":"forecast_value"})
 
     t2 = from(bucket: "iotProject2022")
-|> range(start: -7d)
+|> range(start: -2d)
 |> filter(fn: (r) => r["_measurement"] == "${measurement}")
 |> filter(fn: (r) => r["_field"] == "${field}")
 |> filter(fn: (r) => r["algorithm"] == "${alg}")
@@ -37,7 +37,7 @@ function buildQuery(id, alg, field) {
 
 function buildQuery2(alg, field) {
     return `t1 = from(bucket: "iotProject2022")
-|> range(start: -7d)
+|> range(start: -2d)
 |> filter(fn: (r) => r["_measurement"] == "${measurement}")
 |> filter(fn: (r) => r["_field"] == "forecast_${field}")
 |> filter(fn: (r) => r["algorithm"] == "${alg}")
@@ -45,7 +45,7 @@ function buildQuery2(alg, field) {
 |> rename(columns:{"_value":"forecast_value"})
 
     t2 = from(bucket: "iotProject2022")
-|> range(start: -7d)
+|> range(start: -2d)
 |> filter(fn: (r) => r["_measurement"] == "${measurement}")
 |> filter(fn: (r) => r["_field"] == "${field}")
 |> filter(fn: (r) => r["algorithm"] == "${alg}")
